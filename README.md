@@ -1,4 +1,4 @@
-# 📱 WhatsApp Multi-Device API (Go)
+# 📱 Sudev WhatsApp Multi-Device API (Go)
 
 REST API untuk mengelola WhatsApp Web Multi-Device menggunakan Go, Echo Framework, PostgreSQL, dan library [whatsmeow](https://github.com/tulir/whatsmeow).
 
