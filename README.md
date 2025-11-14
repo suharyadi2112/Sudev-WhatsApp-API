@@ -37,26 +37,47 @@ REST API untuk mengelola WhatsApp Web Multi-Device menggunakan Go, Echo Framewor
 
 gowa-yourself/
 ├── config/
+
 │ └── config.go
+
 ├── database/
+
 │ ├── database.go # WhatsApp protocol DB connection
+
 │ └── app_db.go # Application custom DB connection
+
 ├── internal/
+
 │ ├── handler/ # HTTP request handlers
+
 │ │ ├── auth.go # Login, QR, Status, Logout
+
 │ │ ├── message.go # Personal text messages
+
 │ │ ├── media.go # Personal media messages
+
 │ │ ├── group.go # Group messages & media
+
 │ │ └── response.go # Standard API responses
+
 │ ├── helper/ # Utility functions
+
 │ │ ├── media.go # Media type detection
+
 │ │ └── phone.go # Phone number formatting
+
 │ ├── model/ # Data models & repository
+
 │ │ └── session.go
+
 │ └── service/ # Business logic layer
+
 │ └── whatsapp.go # WhatsApp session management
+
 ├── main.go # Application entry point
+
 ├── go.mod
+
 ├── go.sum
 
 ### Prerequisites
