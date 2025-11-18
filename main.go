@@ -76,6 +76,12 @@ func main() {
 	e.POST("/send-group/:instanceId/media", handler.SendGroupMedia)
 	e.POST("/send-group/:instanceId/media-url", handler.SendGroupMediaURL)
 
+	//Group by no hp
+	e.GET("/groups/by-number/:phoneNumber", handler.GetGroupsByNumber)
+	e.POST("/send-group/by-number/:phoneNumber", handler.SendGroupMessageByNumber)
+	e.POST("/send-group/by-number/:phoneNumber/media", handler.SendGroupMediaByNumber)
+	e.POST("/send-group/by-number/:phoneNumber/media-url", handler.SendGroupMediaURLByNumber)
+
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {
