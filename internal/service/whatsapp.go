@@ -10,6 +10,8 @@ import (
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/model"
 
+	"gowa-yourself/internal/ws"
+
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types/events"
 )
@@ -21,6 +23,7 @@ var (
 	// Track instances yang sedang logout
 	loggingOut     = make(map[string]bool)
 	loggingOutLock sync.RWMutex
+	Realtime       ws.RealtimePublisher
 )
 
 // Event handler untuk handle connection events
@@ -62,6 +65,28 @@ func eventHandler(instanceID string) func(evt interface{}) {
 				); err != nil {
 					fmt.Println("Warning: failed to update instance on connected:", err)
 				}
+
+				// Setelah DB update, kirim event WS
+				if Realtime != nil {
+					now := time.Now().UTC()
+					data := ws.InstanceStatusChangedData{
+						InstanceID:     instanceID,
+						PhoneNumber:    phoneNumber,
+						Status:         "online",
+						IsConnected:    true,
+						ConnectedAt:    &now,
+						DisconnectedAt: nil,
+					}
+
+					evt := ws.WsEvent{
+						Event:     ws.EventInstanceStatusChanged,
+						Timestamp: now,
+						Data:      data,
+					}
+
+					Realtime.Publish(evt)
+				}
+
 			}
 
 		case *events.PairSuccess:
@@ -77,6 +102,30 @@ func eventHandler(instanceID string) func(evt interface{}) {
 
 			if err := model.UpdateInstanceOnLoggedOut(instanceID); err != nil {
 				fmt.Println("Warning: failed to update instance on logged out:", err)
+			} else {
+				// Setelah DB update, kirim event WS status logged_out
+				if Realtime != nil {
+					now := time.Now().UTC()
+
+					data := ws.InstanceStatusChangedData{
+						InstanceID: instanceID,
+						// Kalau kamu simpan phoneNumber di session atau bisa ambil cepat dari DB,
+						// isi di sini. Untuk sementara boleh dikosongkan.
+						PhoneNumber:    "",
+						Status:         "logged_out",
+						IsConnected:    false,
+						ConnectedAt:    nil, // atau isi dari DB kalau mau lebih akurat
+						DisconnectedAt: &now,
+					}
+
+					evt := ws.WsEvent{
+						Event:     ws.EventInstanceStatusChanged,
+						Timestamp: now,
+						Data:      data,
+					}
+
+					Realtime.Publish(evt)
+				}
 			}
 
 		case *events.StreamReplaced:

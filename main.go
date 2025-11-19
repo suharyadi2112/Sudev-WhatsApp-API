@@ -10,6 +10,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+
+	"gowa-yourself/internal/ws"
 )
 
 func main() {
@@ -35,10 +37,18 @@ func main() {
 		log.Printf("Warning: Failed to load devices: %v", err)
 	}
 
+	// Inisialisasi WebSocket Hub
+	hub := ws.NewHub()
+	go hub.Run()
+
+	service.Realtime = hub
+
 	// Setup Echo
 	e := echo.New()
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+
+	e.GET("/ws", handler.WebSocketHandler(hub)) //listen socket gorilla
 
 	// Health check
 	e.GET("/", func(c echo.Context) error {
