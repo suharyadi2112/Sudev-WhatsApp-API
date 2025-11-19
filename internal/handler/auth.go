@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"log"
 	"net/http"
 	"time"
@@ -253,6 +254,43 @@ func Logout(c echo.Context) error {
 	}
 
 	return SuccessResponse(c, 200, "Logged out successfully", map[string]interface{}{
+		"instanceId": instanceID,
+	})
+}
+
+// DELETE /instances/:instanceId
+func DeleteInstance(c echo.Context) error {
+	instanceID := c.Param("instanceId")
+
+	err := service.DeleteInstance(instanceID)
+	if err != nil {
+		// Instance tidak ditemukan
+		if errors.Is(err, service.ErrInstanceNotFound) {
+			return ErrorResponse(c, 404,
+				"Instance not found",
+				"INSTANCE_NOT_FOUND",
+				err.Error(),
+			)
+		}
+
+		// Instance masih terkoneksi / belum logout
+		if errors.Is(err, service.ErrInstanceStillConnected) {
+			return ErrorResponse(c, 400,
+				"Instance is still connected. Please logout first.",
+				"INSTANCE_STILL_CONNECTED",
+				err.Error(),
+			)
+		}
+
+		// Error lain (DB / internal)
+		return ErrorResponse(c, 500,
+			"Failed to delete instance",
+			"DELETE_INSTANCE_FAILED",
+			err.Error(),
+		)
+	}
+
+	return SuccessResponse(c, 200, "Instance deleted successfully", map[string]interface{}{
 		"instanceId": instanceID,
 	})
 }

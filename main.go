@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"gowa-yourself/database"
 	"gowa-yourself/internal/handler"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"golang.org/x/time/rate"
 
 	"gowa-yourself/internal/ws"
 )
@@ -57,6 +59,37 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
+	// Rate limiter: 10 request per detik per IP
+	e.Use(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
+		Store: middleware.NewRateLimiterMemoryStoreWithConfig(
+			middleware.RateLimiterMemoryStoreConfig{
+				Rate:      rate.Limit(10),  // 10 req / detik
+				Burst:     10,              // boleh burst sampai 10
+				ExpiresIn: 3 * time.Minute, // window penyimpanan per IP
+			},
+		),
+	}))
+
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"http://localhost:8080"}, // list asal ip dari request
+		AllowMethods: []string{
+			echo.GET,
+			echo.POST,
+			echo.PUT,
+			echo.PATCH,
+			echo.DELETE,
+			echo.OPTIONS,
+		},
+		AllowHeaders: []string{
+			echo.HeaderOrigin,
+			echo.HeaderContentType,
+			echo.HeaderAccept,
+			echo.HeaderXRequestedWith,
+			echo.HeaderAuthorization,
+		},
+		AllowCredentials: true, // kalau pakai cookie / auth
+	}))
+
 	e.GET("/ws", handler.WebSocketHandler(hub)) //listen socket gorilla
 
 	// Health check
@@ -73,6 +106,7 @@ func main() {
 	e.GET("/qr/:instanceId", handler.GetQR)
 	e.GET("/status/:instanceId", handler.GetStatus)
 	e.POST("/logout/:instanceId", handler.Logout)
+	e.DELETE("/instances/:instanceId", handler.DeleteInstance)
 
 	// ambil semua instance
 	e.GET("/instances", handler.GetAllInstances)

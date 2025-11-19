@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -24,6 +26,9 @@ var (
 	loggingOut     = make(map[string]bool)
 	loggingOutLock sync.RWMutex
 	Realtime       ws.RealtimePublisher
+
+	ErrInstanceNotFound       = errors.New("instance not found")
+	ErrInstanceStillConnected = errors.New("instance still connected")
 )
 
 // Event handler untuk handle connection events
@@ -350,4 +355,45 @@ func DeleteSession(instanceID string) error {
 
 	fmt.Println("✓ Device logged out, session cleared. Instance kept in DB:", instanceID)
 	return nil
+}
+
+func DeleteInstance(instanceID string) error {
+	inst, err := model.GetInstanceByInstanceID(instanceID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrInstanceNotFound
+		}
+		return fmt.Errorf("get instance: %w", err)
+	}
+
+	if inst.IsConnected || inst.Status == "online" {
+		return ErrInstanceStillConnected
+	}
+
+	// Opsional: bersihkan session in-memory + store whatsmeow
+	sess, err := GetSession(instanceID)
+	if err == nil && sess.Client != nil {
+		sess.Client.Disconnect()
+		// Hapus data store whatsmeow
+		_ = sess.Client.Store.Delete(context.Background())
+
+		DeleteSessionFromMemory(instanceID)
+	}
+
+	if err := model.DeleteInstanceByInstanceID(instanceID); err != nil {
+		return fmt.Errorf("delete instance: %w", err)
+	}
+
+	return nil
+}
+
+// Hapus session whatsmeow
+func DeleteSessionFromMemory(instanceID string) {
+	sessionsLock.Lock()
+	defer sessionsLock.Unlock()
+
+	if _, ok := sessions[instanceID]; ok {
+		delete(sessions, instanceID)
+		fmt.Println("Session removed from memory:", instanceID)
+	}
 }

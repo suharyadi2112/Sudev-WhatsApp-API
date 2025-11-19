@@ -368,6 +368,12 @@ func GetInstanceByInstanceID(instanceID string) (*Instance, error) {
 	return inst, nil
 }
 
+// Hapus instance table custom
+func DeleteInstanceByInstanceID(instanceID string) error {
+	_, err := database.AppDB.Exec(`DELETE FROM instances WHERE instance_id = $1`, instanceID)
+	return err
+}
+
 func ToResponse(inst Instance) InstanceResp {
 	resp := InstanceResp{
 		ID:              inst.ID,
