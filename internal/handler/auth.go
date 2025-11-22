@@ -15,12 +15,76 @@ import (
 	"gowa-yourself/internal/service"
 	"gowa-yourself/internal/ws"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 )
 
 // Simpan cancel functions untuk setiap instance
 var qrCancelFuncs = make(map[string]context.CancelFunc)
 var qrCancelMutex sync.RWMutex
+var JwtKey = []byte("secret_key_rahasia") // lebih baik dari ENV
+
+type Claims struct {
+	Username string `json:"username"`
+	jwt.RegisteredClaims
+}
+
+//**********************************
+//
+//SECTION LOGIN USER JWT
+//
+//**********************************
+
+func GenerateJWT(username string) (string, error) {
+	exp := time.Now().Add(1 * time.Hour)
+	claims := Claims{
+		Username: username,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(exp),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(JwtKey)
+}
+
+func LoginJWT(c echo.Context) error {
+	var creds struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := c.Bind(&creds); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Bad request"})
+	}
+	if creds.Username != "sudevwa" || creds.Password != "5ud3vw4" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid credentials"})
+	}
+	token, err := GenerateJWT(creds.Username)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Error generating token"})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"token": token})
+}
+
+func ValidateToken(c echo.Context) error {
+	// JWT middleware sudah validasi token sebelum sampai sini
+	// Jika sampai ke handler ini berarti token valid
+	// Optional: Ambil username dari token claims
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	username := claims["username"].(string)
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success":  true,
+		"message":  "Token is valid",
+		"username": username,
+	})
+}
+
+//**********************************
+//
+//SECTION LOGIN WHATSAPP
+//
+//**********************************
 
 // Generate random instance ID
 func generateInstanceID() string {
@@ -372,15 +436,20 @@ func GetAllInstances(c echo.Context) error {
 
 	// Ambil semua session memory (active sessions)
 	sessions := service.GetAllSessions()
-
 	var instances []model.InstanceResp
 
 	for _, inst := range dbInstances {
+		log.Printf("🔍 Processing instance: %s", inst.InstanceID)
+
 		// Convert dari model.Instance ke model.InstanceResp (string primitif)
 		resp := model.ToResponse(inst)
 
+		log.Printf("  - After ToResponse: Status=%s, IsConnected=%v", resp.Status, resp.IsConnected)
+
 		// Cek apakah ada session aktif untuk instance ini
 		session, found := sessions[inst.InstanceID]
+
+		log.Printf("  - Session found in memory: %v", found)
 
 		if found {
 			resp.IsConnected = session.IsConnected
@@ -389,17 +458,27 @@ func GetAllInstances(c echo.Context) error {
 			if resp.IsConnected {
 				resp.Status = "online"
 			}
+
+			log.Printf("  - Updated: IsConnected=%v, Status=%s", resp.IsConnected, resp.Status)
 		}
+
 		// Tambahkan info apakah session ada di Whatsmeow memory
 		resp.ExistsInWhatsmeow = found
 
-		// Kalau tidak show all, dan instance offline, skip
+		log.Printf("  - showAll=%v, IsConnected=%v", showAll, resp.IsConnected)
+
+		// ✅ INI YANG SUSPECT - Filter logic
 		if !showAll && !resp.IsConnected {
+			log.Printf("  ⚠️ SKIPPED (not showAll and not connected)")
 			continue
 		}
 
+		log.Printf("  ✅ ADDED to result")
+
 		instances = append(instances, resp)
 	}
+
+	log.Printf("📊 Final result: %d instances", len(instances))
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"success": true,
