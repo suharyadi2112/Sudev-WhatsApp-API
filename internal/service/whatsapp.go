@@ -14,7 +14,12 @@ import (
 
 	"gowa-yourself/internal/ws"
 
+	"go.mau.fi/whatsmeow/store"
+	waLog "go.mau.fi/whatsmeow/util/log"
+	"google.golang.org/protobuf/proto"
+
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 )
 
@@ -52,6 +57,14 @@ func eventHandler(instanceID string) func(evt interface{}) {
 				if session.Client.Store.ID != nil {
 					session.JID = session.Client.Store.ID.String()
 				}
+
+				// Kirim presence saat connected, untuk status online di hp
+				if err := session.Client.SendPresence(context.Background(), types.PresenceAvailable); err != nil {
+					fmt.Println("⚠ Failed to send presence for instance:", instanceID, err)
+				} else {
+					fmt.Println("✓ Presence sent (Available) for instance:", instanceID)
+				}
+
 				fmt.Println("✓ Connected! Instance:", instanceID, "JID:", session.JID)
 			}
 			sessionsLock.Unlock()
@@ -92,6 +105,29 @@ func eventHandler(instanceID string) func(evt interface{}) {
 					Realtime.Publish(evt)
 				}
 
+				//Start heartbeat goroutine
+				go func(instID string) {
+					ticker := time.NewTicker(5 * time.Minute)
+					defer ticker.Stop()
+
+					for range ticker.C {
+						sessionsLock.RLock()
+						sess, ok := sessions[instID]
+						sessionsLock.RUnlock()
+
+						if !ok || !sess.IsConnected {
+							fmt.Println("⏹ Stopping heartbeat for:", instID)
+							return // Stop kalau instance sudah disconnect
+						}
+
+						if err := sess.Client.SendPresence(context.Background(), types.PresenceAvailable); err != nil {
+							fmt.Println("⚠ Heartbeat failed for:", instID, err)
+						} else {
+							fmt.Println("💓 Heartbeat sent for:", instID)
+						}
+					}
+				}(instanceID)
+
 			}
 
 		case *events.PairSuccess:
@@ -99,16 +135,31 @@ func eventHandler(instanceID string) func(evt interface{}) {
 
 		case *events.LoggedOut:
 			sessionsLock.Lock()
-			if session, exists := sessions[instanceID]; exists {
+			session, exists := sessions[instanceID]
+			if exists {
 				session.IsConnected = false
 				fmt.Println("✗ Logged out! Instance:", instanceID)
+
+				// Delete device store dari whatsapp-db
+				if session.Client.Store != nil && session.Client.Store.ID != nil {
+					err := database.Container.DeleteDevice(context.Background(), session.Client.Store)
+					if err != nil {
+						fmt.Println("⚠ Failed to delete device store:", err)
+					} else {
+						fmt.Println("✓ Device store deleted for:", instanceID)
+					}
+				}
+
+				// Disconnect client
+				session.Client.Disconnect()
 			}
 			sessionsLock.Unlock()
 
+			// Update DB status
 			if err := model.UpdateInstanceOnLoggedOut(instanceID); err != nil {
 				fmt.Println("Warning: failed to update instance on logged out:", err)
 			} else {
-				// Setelah DB update, kirim event WS status logged_out
+				// Kirim event WS
 				if Realtime != nil {
 					now := time.Now().UTC()
 
@@ -135,6 +186,13 @@ func eventHandler(instanceID string) func(evt interface{}) {
 					Realtime.Publish(evt)
 				}
 			}
+
+			// Hapus session dari memory
+			sessionsLock.Lock()
+			delete(sessions, instanceID)
+			sessionsLock.Unlock()
+
+			fmt.Println("✓ Session cleanup completed for:", instanceID)
 
 		case *events.StreamReplaced:
 			fmt.Println("⚠ Stream replaced! Instance:", instanceID)
@@ -238,11 +296,15 @@ func CreateSession(instanceID string) (*model.Session, error) {
 		return nil, fmt.Errorf("session already exists")
 	}
 
+	// 🔥 Set device name SEBELUM create device (ini global setting)
+	store.DeviceProps.Os = proto.String("SUDEVWA Beta")
+
 	// Buat device baru
 	deviceStore := database.Container.NewDevice()
 
 	// Create whatsmeow client
-	client := whatsmeow.NewClient(deviceStore, nil)
+	clientLog := waLog.Stdout("Client", "INFO", true)
+	client := whatsmeow.NewClient(deviceStore, clientLog)
 
 	// Add event handler
 	client.AddEventHandler(eventHandler(instanceID))
