@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -150,24 +151,17 @@ func GetQR(c echo.Context) error {
 		return ErrorResponse(c, 409, "QR generation already in progress, please wait", "QR_IN_PROGRESS", "Please wait or cancel the current QR generation first.")
 	}
 
-	// Ambil info instance dari DB
-	inst, err := model.GetInstanceByInstanceID(instanceID)
-	if err != nil {
-		return ErrorResponse(c, 404, "Instance not found", "INSTANCE_NOT_FOUND", err.Error())
-	}
-
-	// Kalau sudah logged_out, jangan izinkan QR lagi untuk instance ini
-	if inst.Status == "logged_out" {
-		return ErrorResponse(c, 400,
-			"This instance is logged out and cannot be reused. Please create a new instance for this number.",
-			"INSTANCE_LOGGED_OUT",
-			"",
-		)
-	}
-
+	// Cek session di memory
 	session, err := service.GetSession(instanceID)
-	if err != nil {
-		return ErrorResponse(c, 404, "Session not found. Please create a new instance first.", "SESSION_NOT_FOUND", "")
+	// Kalau session tidak ada (misal: setelah logout), buat session baru
+	if err != nil || session == nil {
+		fmt.Println("⚠ Session not found in memory, creating new session for instance:", instanceID)
+		// CREATE session baru dengan instance ID yang SAMA
+		session, err = service.CreateSession(instanceID)
+		if err != nil {
+			return ErrorResponse(c, 500, "Failed to create session", "CREATE_SESSION_FAILED", err.Error())
+		}
+		fmt.Println("✓ New session created for existing instance:", instanceID)
 	}
 
 	if session.IsConnected {
