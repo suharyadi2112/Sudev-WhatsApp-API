@@ -1,45 +1,38 @@
-# 📱 Sudev WhatsApp Multi-Device API (Go)
+# 📱 SUDEVWA - WhatsApp Multi-Device API (Go)
 
-REST API untuk mengelola WhatsApp Web Multi-Device menggunakan Go, Echo, PostgreSQL, dan library [whatsmeow](https://github.com/tulir/whatsmeow).  
-Proyek masih dalam tahap pengembangan (belum 100%), tetapi core fitur sudah bisa dipakai untuk eksperimen dan integrasi awal.
-
----
+REST API untuk kelola WhatsApp Web Multi-Device pakai Go, Echo, PostgreSQL, dan [whatsmeow](https://github.com/tulir/whatsmeow).
 
 ## ✨ Fitur Utama
 
-### 🔐 Authentication & Session Management
+### 🔐 Authentication & Instance Management
+- Multi-instance — kelola banyak nomor WhatsApp sekaligus
+- QR Code authentication — generate QR untuk pairing device
+- Persistent sessions — session survive restart, tersimpan di PostgreSQL
+- Auto-reconnect — instance otomatis reconnect setelah server restart
+- **Instance reusability** — instance yang logout bisa scan QR ulang tanpa create instance baru
+- Graceful logout — cleanup sempurna (device store + session memory)
 
-- Multi-device support — kelola banyak nomor WhatsApp sekaligus
-- QR Code authentication — generate QR untuk scan di WhatsApp Web / Linked Devices
-- Persistent sessions — session WhatsApp tersimpan di PostgreSQL, survive restart
-- Custom instance store — tabel `instances` menyimpan `instance_id`, `phone_number`, `jid`, `status`, dll.
-- Auto-reconnect — setelah restart server, instance otomatis reconnect dari DB
-- Graceful logout — logout via API / HP, status instance ikut ter-update di DB
+### 💬 Messaging
+- Kirim pesan teks (**by instance ID** atau **by phone number**)
+- Kirim media dari URL / upload file
+- Support text, image, video, document
+- Validasi nomor tujuan sebelum kirim
 
-### 💬 Personal Messaging (By Phone Number)
+### 📲 Device & Presence
+- **Custom device name** — muncul sebagai "SUDEVWA Beta" di Perangkat Tertaut
+- **Presence heartbeat** — status "Aktif sekarang" setiap 5 menit
+- Realtime status tracking (`online`, `disconnected`, `logged_out`)
 
-- Kirim pesan teks: `POST /send/by-number/:phoneNumber`
-- Kirim media dari URL: `POST /send/by-number/:phoneNumber/media-url`
-- Kirim media via upload (form-data): `POST /send/by-number/:phoneNumber/media-file`
-- Normalisasi & validasi nomor tujuan, cek terdaftar di WhatsApp sebelum kirim
+## 🛠️ Status
+✅ Multi-instance, QR auth, send text/media (by instance ID & phone number), presence, reusable instance  
+🚧 Group messaging, templates, broadcast  
+📋 webhooks
 
-> Catatan: Pengiriman pesan personal sekarang berbasis **nomor pengirim**, bukan lagi `instance_id`.
-
-### ⚙️ Instance Lifecycle (By Instance ID)
-
-- Login & QR: generate QR per `instance_id` untuk proses pairing
-- Status instance tersinkron dari event WhatsMeow:
-  - `Connected` → `status = 'online'`, `is_connected = true`
-  - `Disconnected` → `status = 'disconnected'`, `is_connected = false`
-  - `LoggedOut` → `status = 'logged_out'`, instance tidak bisa dipakai login ulang
-- Logout API: unlink device, bersihkan session in-memory, dan update status di DB
-
----
+## ⚠️ Disclaimer
+For educational/research purposes only. Use at your own risk.
 
 ## 🏗️ Tech Stack
+Go 1.21+ (Echo v4) • PostgreSQL 12+ • [whatsmeow](https://github.com/tulir/whatsmeow)
 
-- Go 1.21+ (Echo v4)
-- PostgreSQL 12+
-- WhatsApp Web Multi-Device: [whatsmeow](https://github.com/tulir/whatsmeow)
+**Made with by SUDEV**
 
-> Proyek masih aktif dikembangkan. Struktur endpoint dan fitur bisa berubah seiring waktu.
