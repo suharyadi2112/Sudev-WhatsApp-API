@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -23,7 +24,14 @@ import (
 // Simpan cancel functions untuk setiap instance
 var qrCancelFuncs = make(map[string]context.CancelFunc)
 var qrCancelMutex sync.RWMutex
-var JwtKey = []byte("secret_key_rahasia") // lebih baik dari ENV
+var JwtKey []byte
+var loginUsername string
+var loginPassword string
+
+func InitLoginConfig() {
+	loginUsername = os.Getenv("APP_LOGIN_USERNAME")
+	loginPassword = os.Getenv("APP_LOGIN_PASSWORD")
+}
 
 type Claims struct {
 	Username string `json:"username"`
@@ -35,6 +43,10 @@ type Claims struct {
 //SECTION LOGIN USER JWT
 //
 //**********************************
+
+func InitJWTKey(secret string) {
+	JwtKey = []byte(secret)
+}
 
 func GenerateJWT(username string) (string, error) {
 	exp := time.Now().Add(1 * time.Hour)
@@ -56,9 +68,11 @@ func LoginJWT(c echo.Context) error {
 	if err := c.Bind(&creds); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Bad request"})
 	}
-	if creds.Username != "sudevwa" || creds.Password != "5ud3vw4" {
+
+	if creds.Username != loginUsername || creds.Password != loginPassword {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid credentials"})
 	}
+
 	token, err := GenerateJWT(creds.Username)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Error generating token"})
@@ -437,13 +451,8 @@ func GetAllInstances(c echo.Context) error {
 
 		// Convert dari model.Instance ke model.InstanceResp (string primitif)
 		resp := model.ToResponse(inst)
-
-		log.Printf("  - After ToResponse: Status=%s, IsConnected=%v", resp.Status, resp.IsConnected)
-
 		// Cek apakah ada session aktif untuk instance ini
 		session, found := sessions[inst.InstanceID]
-
-		log.Printf("  - Session found in memory: %v", found)
 
 		if found {
 			resp.IsConnected = session.IsConnected
@@ -452,27 +461,18 @@ func GetAllInstances(c echo.Context) error {
 			if resp.IsConnected {
 				resp.Status = "online"
 			}
-
-			log.Printf("  - Updated: IsConnected=%v, Status=%s", resp.IsConnected, resp.Status)
 		}
 
 		// Tambahkan info apakah session ada di Whatsmeow memory
 		resp.ExistsInWhatsmeow = found
-
-		log.Printf("  - showAll=%v, IsConnected=%v", showAll, resp.IsConnected)
 
 		// ✅ INI YANG SUSPECT - Filter logic
 		if !showAll && !resp.IsConnected {
 			log.Printf("  ⚠️ SKIPPED (not showAll and not connected)")
 			continue
 		}
-
-		log.Printf("  ✅ ADDED to result")
-
 		instances = append(instances, resp)
 	}
-
-	log.Printf("📊 Final result: %d instances", len(instances))
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"success": true,
