@@ -198,6 +198,9 @@ func main() {
 	api.POST("/send-group/by-number/:phoneNumber/media", handler.SendGroupMediaByNumber)
 	api.POST("/send-group/by-number/:phoneNumber/media-url", handler.SendGroupMediaURLByNumber)
 
+	//get info akun
+	api.GET("/info-device/:instanceId", handler.GetDeviceInfo)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "2121" // boleh ada default aman
