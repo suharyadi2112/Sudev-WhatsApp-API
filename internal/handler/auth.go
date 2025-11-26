@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"gowa-yourself/internal/model"
@@ -428,8 +429,14 @@ func GetStatus(c echo.Context) error {
 	})
 }
 
+var instancesCall int64
+
 // GET /instances?all=true
 func GetAllInstances(c echo.Context) error {
+
+	id := atomic.AddInt64(&instancesCall, 1)
+	log.Printf("➡️ GetAllInstances CALL #%d at %s", id, time.Now().Format(time.RFC3339Nano))
+
 	showAll := c.QueryParam("all") == "true"
 
 	// Ambil semua instance dari table custom

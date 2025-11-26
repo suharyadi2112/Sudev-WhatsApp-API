@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"gowa-yourself/database"
@@ -80,8 +81,17 @@ func main() {
 	// e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
+	//env allow ip
+	originsEnv := os.Getenv("CORS_ALLOW_ORIGINS")
+	if originsEnv == "" {
+		log.Fatal("CORS_ALLOW_ORIGINS is not set")
+	}
+	allowOrigins := strings.Split(originsEnv, ",")
+	for i, o := range allowOrigins {
+		allowOrigins[i] = strings.TrimSpace(o)
+	}
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"http://localhost:8080"}, // list asal ip dari request
+		AllowOrigins: allowOrigins,
 		AllowMethods: []string{
 			echo.GET,
 			echo.POST,
@@ -97,7 +107,7 @@ func main() {
 			echo.HeaderXRequestedWith,
 			echo.HeaderAuthorization,
 		},
-		AllowCredentials: true, // kalau pakai cookie / auth
+		AllowCredentials: true,
 	}))
 	e.OPTIONS("/*", func(c echo.Context) error {
 		return c.NoContent(http.StatusOK)
