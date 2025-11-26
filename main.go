@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"gowa-yourself/database"
@@ -12,6 +13,7 @@ import (
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/service"
 
+	"github.com/joho/godotenv"
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -21,20 +23,37 @@ import (
 )
 
 func main() {
-	// Load env
+
+	// Load .env (abaikan error kalau file tidak ada, misal di production)
+	_ = godotenv.Load()
+
+	//database whatsmeow
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		dbURL = "postgres://postgres:12345678@localhost:5432/whatsapp-2121?sslmode=disable"
+		log.Fatal("DATABASE_URL is not set")
 	}
-
 	database.InitWhatsmeow(dbURL)
 
-	// App DB (custom instances)
+	//database custom
 	appDbURL := os.Getenv("APP_DATABASE_URL")
 	if appDbURL == "" {
-		appDbURL = "postgres://postgres:12345678@localhost:5432/custom-sudevwa?sslmode=disable"
+		log.Fatal("APP_DATABASE_URL is not set")
 	}
 	database.InitAppDB(appDbURL)
+
+	//jwt
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET is not set")
+	}
+	handler.InitJWTKey(jwtSecret)
+
+	//user jwt
+	handler.InitLoginConfig()
+
+	// **************************
+	// main proses.
+	//***************************
 
 	runCreateSchema := false
 	if len(os.Args) > 1 && os.Args[1] == "--createschema" {
@@ -59,11 +78,20 @@ func main() {
 
 	// Setup Echo
 	e := echo.New()
-	e.Use(middleware.Logger())
+	// e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
+	//env allow ip
+	originsEnv := os.Getenv("CORS_ALLOW_ORIGINS")
+	if originsEnv == "" {
+		log.Fatal("CORS_ALLOW_ORIGINS is not set")
+	}
+	allowOrigins := strings.Split(originsEnv, ",")
+	for i, o := range allowOrigins {
+		allowOrigins[i] = strings.TrimSpace(o)
+	}
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"http://localhost:8080"}, // list asal ip dari request
+		AllowOrigins: allowOrigins,
 		AllowMethods: []string{
 			echo.GET,
 			echo.POST,
@@ -79,7 +107,7 @@ func main() {
 			echo.HeaderXRequestedWith,
 			echo.HeaderAuthorization,
 		},
-		AllowCredentials: true, // kalau pakai cookie / auth
+		AllowCredentials: true,
 	}))
 	e.OPTIONS("/*", func(c echo.Context) error {
 		return c.NoContent(http.StatusOK)
@@ -180,12 +208,14 @@ func main() {
 	api.POST("/send-group/by-number/:phoneNumber/media", handler.SendGroupMediaByNumber)
 	api.POST("/send-group/by-number/:phoneNumber/media-url", handler.SendGroupMediaURLByNumber)
 
-	// Start server
+	//get info akun
+	api.GET("/info-device/:instanceId", handler.GetDeviceInfo)
+
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "2121"
+		port = "2121" // boleh ada default aman
 	}
-
 	log.Printf("Server starting on port %s", port)
 	log.Fatal(e.Start("127.0.0.1:" + port))
+
 }
