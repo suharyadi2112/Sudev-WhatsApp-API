@@ -213,9 +213,18 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "2121" // boleh ada default aman
+		port = "2121" // default aman
 	}
-	log.Printf("Server starting on port %s", port)
-	log.Fatal(e.Start("127.0.0.1:" + port))
+
+	baseURL := os.Getenv("BASEURL")
+	if baseURL == "" {
+		log.Fatal("BASEURL is not set")
+	}
+
+	// log info untuk cek config
+	log.Printf("Server starting on port %s, baseURL=%s", port, baseURL)
+
+	// bind ke semua interface, bukan hanya 127.0.0.1
+	log.Fatal(e.Start(":" + port))
 
 }
