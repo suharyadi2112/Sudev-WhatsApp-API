@@ -29,7 +29,8 @@ type Instance struct {
 	ConnectedAt     sql.NullTime
 	DisconnectedAt  sql.NullTime
 	LastSeen        sql.NullTime
-	SessionData     []byte // tambahkan ini
+	SessionData     []byte
+	Circle          string `db:"circle"`
 }
 
 type InstanceResp struct {
@@ -123,8 +124,8 @@ func GetActiveInstanceByPhoneNumber(phoneNumber string) (*Instance, error) {
 func InsertInstance(in *Instance) error {
 	query := `
     INSERT INTO instances (
-        instance_id, status, is_connected, created_at, session_data
-    ) VALUES ($1, $2, $3, $4, $5)`
+        instance_id, status, is_connected, created_at, session_data, circle
+    ) VALUES ($1, $2, $3, $4, $5, $6)`
 	_, err := database.AppDB.Exec(
 		query,
 		in.InstanceID,
@@ -132,6 +133,7 @@ func InsertInstance(in *Instance) error {
 		in.IsConnected,
 		in.CreatedAt,
 		in.SessionData, // <- pastikan mengisi ini (bisa nil untuk awal)
+		in.Circle,
 	)
 	return err
 }
