@@ -154,7 +154,6 @@ func Login(c echo.Context) error {
 	}
 	err = model.InsertInstance(instance)
 	if err != nil {
-		log.Fatal("Failed to insert instance DB_INSERT_FAILED")
 		return ErrorResponse(c, 500, "Failed to insert instance", "DB_INSERT_FAILED", err.Error())
 	}
 
