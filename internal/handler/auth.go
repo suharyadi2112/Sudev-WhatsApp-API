@@ -113,6 +113,17 @@ func generateInstanceID() string {
 func Login(c echo.Context) error {
 	instanceID := generateInstanceID()
 
+	// payload input
+	var req struct {
+		Kelompok string `json:"kelompok"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return ErrorResponse(c, 400, "Invalid request body", "BAD_REQUEST", err.Error())
+	}
+	if strings.TrimSpace(req.Kelompok) == "" {
+		return ErrorResponse(c, 400, "Field 'kelompok' is required", "KELOMPOK_REQUIRED", "")
+	}
+
 	session, err := service.CreateSession(instanceID)
 	if err != nil {
 		return ErrorResponse(c, 400, "Failed to create session", "CREATE_SESSION_FAILED", err.Error())
@@ -139,6 +150,7 @@ func Login(c echo.Context) error {
 		Status:      "qr_required",
 		IsConnected: false,
 		CreatedAt:   time.Now(),
+		Circle:      req.Kelompok,
 	}
 	err = model.InsertInstance(instance)
 	if err != nil {

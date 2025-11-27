@@ -29,7 +29,8 @@ type Instance struct {
 	ConnectedAt     sql.NullTime
 	DisconnectedAt  sql.NullTime
 	LastSeen        sql.NullTime
-	SessionData     []byte // tambahkan ini
+	SessionData     []byte
+	Circle          string
 }
 
 type InstanceResp struct {
@@ -52,6 +53,7 @@ type InstanceResp struct {
 	DisconnectedAt    time.Time `json:"disconnectedAt"`
 	LastSeen          time.Time `json:"lastSeen"`
 	ExistsInWhatsmeow bool      `json:"existsInWhatsmeow"`
+	Circle            string    `json:"circle"`
 }
 
 var ErrNoActiveInstance = errors.New("no active instance for this phone number")
@@ -123,8 +125,8 @@ func GetActiveInstanceByPhoneNumber(phoneNumber string) (*Instance, error) {
 func InsertInstance(in *Instance) error {
 	query := `
     INSERT INTO instances (
-        instance_id, status, is_connected, created_at, session_data
-    ) VALUES ($1, $2, $3, $4, $5)`
+        instance_id, status, is_connected, created_at, session_data, circle
+    ) VALUES ($1, $2, $3, $4, $5, $6)`
 	_, err := database.AppDB.Exec(
 		query,
 		in.InstanceID,
@@ -132,6 +134,7 @@ func InsertInstance(in *Instance) error {
 		in.IsConnected,
 		in.CreatedAt,
 		in.SessionData, // <- pastikan mengisi ini (bisa nil untuk awal)
+		in.Circle,
 	)
 	return err
 }
@@ -169,7 +172,8 @@ func GetAllInstances() ([]Instance, error) {
             connected_at,
             disconnected_at,
             last_seen,
-            session_data
+            session_data,
+			circle
         FROM instances
         ORDER BY created_at DESC
     `
@@ -204,6 +208,7 @@ func GetAllInstances() ([]Instance, error) {
 			&inst.DisconnectedAt,
 			&inst.LastSeen,
 			&inst.SessionData,
+			&inst.Circle,
 		)
 
 		if err != nil {
@@ -426,6 +431,7 @@ func ToResponse(inst Instance) InstanceResp {
 		IsConnected:     inst.IsConnected,
 		BatteryLevel:    0,
 		BatteryCharging: false,
+		Circle:          inst.Circle,
 	}
 
 	if inst.PhoneNumber.Valid {

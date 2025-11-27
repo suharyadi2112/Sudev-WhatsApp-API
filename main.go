@@ -44,7 +44,7 @@ func main() {
 	//jwt
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		log.Fatal("JWT_SECRET is not set")
+		log.Println("JWT_SECRET is not set")
 	}
 	handler.InitJWTKey(jwtSecret)
 
@@ -84,7 +84,7 @@ func main() {
 	//env allow ip
 	originsEnv := os.Getenv("CORS_ALLOW_ORIGINS")
 	if originsEnv == "" {
-		log.Fatal("CORS_ALLOW_ORIGINS is not set")
+		log.Println("CORS_ALLOW_ORIGINS is not set")
 	}
 	allowOrigins := strings.Split(originsEnv, ",")
 	for i, o := range allowOrigins {

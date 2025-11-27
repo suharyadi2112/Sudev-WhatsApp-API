@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"log"
+
 	"github.com/labstack/echo/v4"
 )
 
@@ -40,5 +42,6 @@ func ErrorResponse(c echo.Context, statusCode int, message string, errorCode str
 		}
 	}
 
+	log.Println("Error:", message, "| Code:", errorCode, "| Details:", details)
 	return c.JSON(statusCode, response)
 }
