@@ -30,7 +30,7 @@ type Instance struct {
 	DisconnectedAt  sql.NullTime
 	LastSeen        sql.NullTime
 	SessionData     []byte
-	Circle          string `db:"circle"`
+	Circle          string
 }
 
 type InstanceResp struct {
@@ -53,6 +53,7 @@ type InstanceResp struct {
 	DisconnectedAt    time.Time `json:"disconnectedAt"`
 	LastSeen          time.Time `json:"lastSeen"`
 	ExistsInWhatsmeow bool      `json:"existsInWhatsmeow"`
+	Circle            string    `json:"circle"`
 }
 
 var ErrNoActiveInstance = errors.New("no active instance for this phone number")
@@ -171,7 +172,8 @@ func GetAllInstances() ([]Instance, error) {
             connected_at,
             disconnected_at,
             last_seen,
-            session_data
+            session_data,
+			circle
         FROM instances
         ORDER BY created_at DESC
     `
@@ -206,6 +208,7 @@ func GetAllInstances() ([]Instance, error) {
 			&inst.DisconnectedAt,
 			&inst.LastSeen,
 			&inst.SessionData,
+			&inst.Circle,
 		)
 
 		if err != nil {
@@ -428,6 +431,7 @@ func ToResponse(inst Instance) InstanceResp {
 		IsConnected:     inst.IsConnected,
 		BatteryLevel:    0,
 		BatteryCharging: false,
+		Circle:          inst.Circle,
 	}
 
 	if inst.PhoneNumber.Valid {
