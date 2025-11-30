@@ -19,7 +19,6 @@ REST API untuk kelola WhatsApp Web Multi-Device pakai Go, Echo, PostgreSQL, dan 
 - Validasi nomor tujuan sebelum kirim
 
 ### 📲 Device & Presence
-- **Custom device name** — muncul sebagai "SUDEVWA Beta" di Perangkat Tertaut
 - **Presence heartbeat** — status "Aktif sekarang" setiap 5 menit
 - Realtime status tracking (`online`, `disconnected`, `logged_out`)
 
