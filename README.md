@@ -31,6 +31,53 @@ REST API for managing WhatsApp Web Multi-Device using Go, Echo, PostgreSQL, and 
 - **Presence heartbeat** — "Active now" status every 5 minutes
 - Real-time status tracking (`online`, `disconnected`, `logged_out`)
 
+### Global WebSocket - System Events
+
+```
+ws://127.0.0.1:{port}/ws
+```
+
+**Purpose:** Monitor QR code generation, login/logout events, connection status changes for all instances
+
+**Events received:**
+- QR code generated
+- Instance connected/disconnected
+- Instance status changed
+- System-wide notifications
+
+### Instance-Specific WebSocket - Incoming Messages
+
+```
+ws://localhost:2121/api/listen/:instanceId
+```
+
+**Purpose:** Listen to incoming WhatsApp messages for a specific instance only
+
+**Headers:**
+
+```
+Authorization: Bearer {token}
+```
+
+**Events received:**
+
+```
+{
+  "event": "incoming_message",
+  "timestamp": "2025-12-07T23:22:00Z",
+  "data": {
+    "instance_id": "instance123",
+    "from": "6281234567890@s.whatsapp.net",
+    "from_me": false,
+    "message": "Hello World",
+    "timestamp": 1733587980,
+    "is_group": false,
+    "message_id": "3EB0ABC123DEF456",
+    "push_name": "John Doe"
+  }
+}
+```
+
 ## ⚠️ Disclaimer
 For educational/research purposes only. Use at your own risk.
 
