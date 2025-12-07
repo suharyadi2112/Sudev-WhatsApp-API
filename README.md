@@ -1,7 +1,11 @@
-# 📱 SUDEVWA - WhatsApp Multi-Device API (Go)
+# 📱 SUDEVWA - WhatsApp Multi-Instance API (Go/Golang)
 
-REST API for managing WhatsApp Web Multi-Device using Go, Echo, PostgreSQL, and [whatsmeow](https://github.com/tulir/whatsmeow).
+> **WhatsApp Automation API** | **Multi-Device Management** | **Real-time WebSocket** | **Go + Echo + Whatsmeow**
 
+REST API for **WhatsApp Web automation**, **multi-instance management**, and **real-time messaging** built with **Go (Golang)**, **Echo framework**, and **whatsmeow library**.
+
+## 🔍 Keywords
+WhatsApp API, WhatsApp Bot, Multi-instance WhatsApp, WhatsApp Automation, Go WhatsApp, Whatsmeow, WebSocket Real-time, REST API, PostgreSQL, Echo Framework
 ## ✨ Key Features
 
 ### 🔐 Authentication & Instance Management
@@ -89,5 +93,23 @@ For educational/research purposes only. Use at your own risk.
 
 ## 🏗️ Tech Stack
 Go 1.21+ (Echo v4) • PostgreSQL 12+ • [whatsmeow](https://github.com/tulir/whatsmeow) • Gorilla WebSocket
+
+![GitHub stars](https://img.shields.io/github/stars/suharyadi2112/Sudev-Whatsapp-Tools?style=social)
+![GitHub forks](https://img.shields.io/github/forks/suharyadi2112/Sudev-Whatsapp-Tools?style=social)
+![GitHub issues](https://img.shields.io/github/issues/suharyadi2112/Sudev-Whatsapp-Tools)
+![License](https://img.shields.io/github/license/suharyadi2112/Sudev-Whatsapp-Tools)
+![Go Version](https://img.shields.io/github/go-mod/go-version/suharyadi2112/Sudev-Whatsapp-Tools)
+
+
+## ⭐ Support This Project
+
+If you find this project useful, please consider:
+- ⭐ **Star this repository**
+- 🍴 **Fork and contribute**
+- 🐛 **Report issues**
+- 📢 **Share with your network**
+
+Your support helps maintain and improve this project!
+
 
 **Made by SUDEV**
