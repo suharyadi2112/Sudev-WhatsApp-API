@@ -31,6 +31,12 @@ REST API for managing WhatsApp Web Multi-Device using Go, Echo, PostgreSQL, and 
 - **Presence heartbeat** — "Active now" status every 5 minutes
 - Real-time status tracking (`online`, `disconnected`, `logged_out`)
 
+### API Reference
+
+```
+- https://soqnnmoe17.apidog.io/
+```
+
 ### Global WebSocket - System Events
 
 ```
