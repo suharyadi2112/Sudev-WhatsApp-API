@@ -1,7 +1,11 @@
-# 📱 SUDEVWA - WhatsApp Multi-Device API (Go)
+# 📱 SUDEVWA - WhatsApp Multi-Instance API (Go/Golang)
 
-REST API for managing WhatsApp Web Multi-Device using Go, Echo, PostgreSQL, and [whatsmeow](https://github.com/tulir/whatsmeow).
+> **WhatsApp Automation API** | **Multi-Device Management** | **Real-time WebSocket** | **Go + Echo + Whatsmeow**
 
+REST API for **WhatsApp Web automation**, **multi-instance management**, and **real-time messaging** built with **Go (Golang)**, **Echo framework**, and **whatsmeow library**.
+
+## 🔍 Keywords
+WhatsApp API, WhatsApp Bot, Multi-instance WhatsApp, WhatsApp Automation, Go WhatsApp, Whatsmeow, WebSocket Real-time, REST API, PostgreSQL, Echo Framework
 ## ✨ Key Features
 
 ### 🔐 Authentication & Instance Management
