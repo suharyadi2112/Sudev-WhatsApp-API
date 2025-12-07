@@ -1,38 +1,40 @@
 # 📱 SUDEVWA - WhatsApp Multi-Device API (Go)
 
-REST API untuk kelola WhatsApp Web Multi-Device pakai Go, Echo, PostgreSQL, dan [whatsmeow](https://github.com/tulir/whatsmeow).
+REST API for managing WhatsApp Web Multi-Device using Go, Echo, PostgreSQL, and [whatsmeow](https://github.com/tulir/whatsmeow).
 
-## ✨ Fitur Utama
+## ✨ Key Features
 
 ### 🔐 Authentication & Instance Management
-- Multi-instance — kelola banyak nomor WhatsApp sekaligus
-- QR Code authentication — generate QR untuk pairing device
-- Persistent sessions — session survive restart, tersimpan di PostgreSQL
-- Auto-reconnect — instance otomatis reconnect setelah server restart
-- **Instance reusability** — instance yang logout bisa scan QR ulang tanpa create instance baru
-- Graceful logout — cleanup sempurna (device store + session memory)
+- Multi-instance — manage multiple WhatsApp numbers simultaneously
+- QR Code authentication — generate QR for device pairing
+- Persistent sessions — sessions survive restart, stored in PostgreSQL
+- Auto-reconnect — instances automatically reconnect after server restart
+- **Instance reusability** — logged out instances can scan QR again without creating new instance
+- Graceful logout — complete cleanup (device store + session memory)
 
 ### 💬 Messaging
-- Kirim pesan teks (**by instance ID** atau **by phone number**)
-- Kirim media dari URL / upload file
+- Send text messages (**by instance ID** or **by phone number**)
+- Send media from URL / file upload
 - Support text, image, video, document
-- Validasi nomor tujuan sebelum kirim
+- Recipient number validation before sending
+- **Real-time incoming message listener** — listen to incoming messages via WebSocket per instance
+
+### 🔌 Real-time Features (WebSocket)
+- **Global WebSocket** (`/ws`) — monitor QR events, status changes, system events for all instances
+- **Instance-specific WebSocket** (`/api/listen/:instanceId`) — listen to incoming messages for specific instance
+- **Ping-based keep-alive** — connection stays alive with ping every 5 minutes
+- **Auto-cleanup** — ghost connections automatically removed after 15 minutes timeout
+- Support text messages, extended messages, image/video captions
 
 ### 📲 Device & Presence
-- **Custom device name** — muncul sebagai "SUDEVWA Beta" di Perangkat Tertaut
-- **Presence heartbeat** — status "Aktif sekarang" setiap 5 menit
-- Realtime status tracking (`online`, `disconnected`, `logged_out`)
-
-## 🛠️ Status
-✅ Multi-instance, QR auth, send text/media (by instance ID & phone number), presence, reusable instance  
-🚧 Group messaging, templates, broadcast  
-📋 webhooks
+- **Custom device name** — appears as "SUDEVWA Beta" in Linked Devices
+- **Presence heartbeat** — "Active now" status every 5 minutes
+- Real-time status tracking (`online`, `disconnected`, `logged_out`)
 
 ## ⚠️ Disclaimer
 For educational/research purposes only. Use at your own risk.
 
 ## 🏗️ Tech Stack
-Go 1.21+ (Echo v4) • PostgreSQL 12+ • [whatsmeow](https://github.com/tulir/whatsmeow)
+Go 1.21+ (Echo v4) • PostgreSQL 12+ • [whatsmeow](https://github.com/tulir/whatsmeow) • Gorilla WebSocket
 
-**Made with by SUDEV**
-
+**Made by SUDEV**

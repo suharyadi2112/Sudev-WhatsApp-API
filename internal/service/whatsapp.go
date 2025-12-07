@@ -39,7 +39,7 @@ var (
 // Event handler untuk handle connection events
 func eventHandler(instanceID string) func(evt interface{}) {
 	return func(evt interface{}) {
-		switch evt.(type) {
+		switch v := evt.(type) {
 
 		case *events.Connected:
 			loggingOutLock.RLock()
@@ -214,7 +214,47 @@ func eventHandler(instanceID string) func(evt interface{}) {
 					fmt.Println("Warning: failed to update instance on disconnected:", err)
 				}
 			}
+
+		//Handle incoming messages
+		case *events.Message:
+			fmt.Printf("📨 Received message from %s: %s\n", v.Info.Sender, v.Message.GetConversation())
+
+			// Broadcast ke WebSocket listener
+			if Realtime != nil {
+				messageText := v.Message.GetConversation()
+
+				// Handle extended text message (reply, link preview, etc)
+				if messageText == "" && v.Message.ExtendedTextMessage != nil {
+					messageText = v.Message.GetExtendedTextMessage().GetText()
+				}
+
+				// Handle image caption
+				if messageText == "" && v.Message.ImageMessage != nil {
+					messageText = v.Message.GetImageMessage().GetCaption()
+				}
+
+				// Handle video caption
+				if messageText == "" && v.Message.VideoMessage != nil {
+					messageText = v.Message.GetVideoMessage().GetCaption()
+				}
+
+				Realtime.BroadcastToInstance(instanceID, map[string]interface{}{
+					"event":       "incoming_message",
+					"instance_id": instanceID,
+					"from":        v.Info.Sender.String(),
+					"from_me":     v.Info.IsFromMe,
+					"message":     messageText,
+					"timestamp":   v.Info.Timestamp.Unix(),
+					"is_group":    v.Info.IsGroup,
+					"message_id":  v.Info.ID,
+					"push_name":   v.Info.PushName,
+				})
+
+				fmt.Printf("✓ Message broadcasted to WebSocket listeners for instance: %s\n", instanceID)
+			}
+
 		}
+
 	}
 }
 

@@ -22,6 +22,8 @@ type Client struct {
 	// misalnya UserID / TenantID / daftar InstanceID yang di-subscribe.
 	// Untuk versi awal bisa dikosongkan dulu.
 	// UserID string
+
+	InstanceID string
 }
 
 // Hub menyimpan semua client aktif dan menangani broadcast event.
@@ -112,40 +114,64 @@ func (h *Hub) Publish(event WsEvent) {
 // (whatsapp.go, handler QR) agar tidak tergantung langsung ke Hub.
 type RealtimePublisher interface {
 	Publish(event WsEvent)
+	BroadcastToInstance(instanceID string, data map[string]interface{})
 }
 
 // NewClient membuat objek Client baru dari koneksi Gorilla WebSocket.
 // Fungsi ini tidak menjalankan goroutine read/write; itu tugas handler WS.
+// NewClient membuat objek Client baru dari koneksi Gorilla WebSocket.
 func NewClient(hub *Hub, conn *websocket.Conn) *Client {
 	return &Client{
-		hub:  hub,
-		conn: conn,
-		send: make(chan WsEvent, 256),
+		hub:        hub,
+		conn:       conn,
+		send:       make(chan WsEvent, 256),
+		InstanceID: "", // default kosong, akan di-set dari handler
 	}
 }
 
 // WritePump adalah loop yang mengirim event dari channel send ke koneksi WS.
 // Biasanya dipanggil sebagai goroutine dari handler /ws.
 func (c *Client) WritePump() {
+	ticker := time.NewTicker(5 * time.Minute) // Ping setiap 5 menit
+
 	defer func() {
+		ticker.Stop()
 		c.hub.Unregister(c)
 		_ = c.conn.Close()
 	}()
 
-	for event := range c.send {
-		// Encode WsEvent ke JSON.
-		payload, err := json.Marshal(event)
-		if err != nil {
-			log.Printf("ws: failed to marshal event: %v", err)
-			continue
-		}
+	for {
+		select {
+		case event, ok := <-c.send:
+			// Set deadline sederhana supaya tidak hang selamanya.
+			_ = c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 
-		// Set deadline sederhana supaya tidak hang selamanya.
-		_ = c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if !ok {
+				// Channel closed
+				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
 
-		if err := c.conn.WriteMessage(websocket.TextMessage, payload); err != nil {
-			log.Printf("ws: failed to write message: %v", err)
-			return
+			// Encode WsEvent ke JSON.
+			payload, err := json.Marshal(event)
+			if err != nil {
+				log.Printf("ws: failed to marshal event: %v", err)
+				continue
+			}
+
+			if err := c.conn.WriteMessage(websocket.TextMessage, payload); err != nil {
+				log.Printf("ws: failed to write message: %v", err)
+				return
+			}
+
+		case <-ticker.C:
+			// Kirim ping untuk keep connection alive
+			_ = c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				log.Printf("ws: failed to send ping: %v", err)
+				return
+			}
+			log.Printf("ws: ping sent to instance: %s", c.InstanceID)
 		}
 	}
 }
@@ -173,6 +199,26 @@ func (c *Client) ReadPump() {
 		if err != nil {
 			log.Printf("ws read error: %v", err)
 			break
+		}
+	}
+}
+
+// BroadcastToInstance kirim message ke client yang listen instance tertentu
+func (h *Hub) BroadcastToInstance(instanceID string, data map[string]interface{}) {
+	event := WsEvent{
+		Event:     "incoming_message",
+		Timestamp: time.Now(),
+		Data:      data,
+	}
+
+	for client := range h.clients {
+		if client.InstanceID == instanceID {
+			select {
+			case client.send <- event:
+			default:
+				close(client.send)
+				delete(h.clients, client)
+			}
 		}
 	}
 }
