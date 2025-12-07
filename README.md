@@ -94,4 +94,10 @@ For educational/research purposes only. Use at your own risk.
 ## 🏗️ Tech Stack
 Go 1.21+ (Echo v4) • PostgreSQL 12+ • [whatsmeow](https://github.com/tulir/whatsmeow) • Gorilla WebSocket
 
+![GitHub stars](https://img.shields.io/github/stars/suharyadi2112/Sudev-Whatsapp-Tools?style=social)
+![GitHub forks](https://img.shields.io/github/forks/suharyadi2112/Sudev-Whatsapp-Tools?style=social)
+![GitHub issues](https://img.shields.io/github/issues/suharyadi2112/Sudev-Whatsapp-Tools)
+![License](https://img.shields.io/github/license/suharyadi2112/Sudev-Whatsapp-Tools)
+![Go Version](https://img.shields.io/github/go-mod/go-version/suharyadi2112/Sudev-Whatsapp-Tools)
+
 **Made by SUDEV**
