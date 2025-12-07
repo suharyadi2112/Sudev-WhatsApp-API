@@ -181,6 +181,9 @@ func main() {
 	api.DELETE("/instances/:instanceId", handler.DeleteInstance)
 	api.DELETE("/qr-cancel/:instanceId", handler.CancelQR)
 
+	//dapatkan pesan masuk, pakai ws
+	api.GET("/listen/:instanceId", handler.ListenMessages(hub))
+
 	// ambil semua instance
 	api.GET("/instances", handler.GetAllInstances)
 
