@@ -101,17 +101,31 @@ SUDEVWA_ENABLE_WEBHOOK=true
 If this variable is not set, or set to anything other than `true`, webhooks will not be sent.
 
 ### Configure Webhook per Instance
+For webhook security, SUDEVWA signs every outgoing webhook (when a secret is configured for the instance) using an HMAC:
+
+- Header: `X-SUDEVWA-Signature`
+- Algorithm: `HMAC-SHA256`
+- Message: raw HTTP request body (bytes)
+- Key: the instance-specific `webhook_secret`
+
 ```
-POST /api/instances/:instanceId/webhook
+POST /api/instances/:instanceId/webhook-setconfig
 Authorization: Bearer {token}
 Content-Type: application/json
 ```
-
 Example body:
 ```
 {
-"url": "https://your-app.com/wa-webhook",
-"secret": "OPTIONAL_SECRET_KEY"
+"url": "https://your-app.com/wa-webhook"
+"secret": "5513de0882c755985f4bb358e5cf027cb10e48a23a377cf77888e310b74aef21" //optional autogenerate if none
+}
+```
+Response : 
+```
+{
+"instanceId": "instance123",
+"webhookUrl": "https://your-app.com/wa-webhook",
+"secret": "5513de0882c755985f4bb358e5cf027cb10e48a23a377cf77888e310b74aef21"
 }
 ```
 Webhook Payload
@@ -130,7 +144,6 @@ Webhook Payload
 "push_name": "John Doe"
 }
 ```
-
 
 ## ⚠️ Disclaimer
 For educational/research purposes only. Use at your own risk.
