@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gowa-yourself/database"
+	"gowa-yourself/internal/config"
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/model"
 
@@ -238,8 +239,8 @@ func eventHandler(instanceID string) func(evt interface{}) {
 					messageText = v.Message.GetVideoMessage().GetCaption()
 				}
 
-				Realtime.BroadcastToInstance(instanceID, map[string]interface{}{
-					"event":       "incoming_message",
+				// Data payload yang dipakai WS & webhook
+				payload := map[string]interface{}{
 					"instance_id": instanceID,
 					"from":        v.Info.Sender.String(),
 					"from_me":     v.Info.IsFromMe,
@@ -248,9 +249,21 @@ func eventHandler(instanceID string) func(evt interface{}) {
 					"is_group":    v.Info.IsGroup,
 					"message_id":  v.Info.ID,
 					"push_name":   v.Info.PushName,
-				})
+				}
 
-				fmt.Printf("✓ Message broadcasted to WebSocket listeners for instance: %s\n", instanceID)
+				if config.EnableWebsocket && Realtime != nil {
+					Realtime.BroadcastToInstance(instanceID, map[string]interface{}{
+						"event": "incoming_message",
+						"data":  payload,
+					})
+					fmt.Printf("✓ Message broadcasted to WebSocket listeners for instance: %s\n", instanceID)
+				}
+
+				if config.EnableWebhook {
+					SendIncomingMessageWebhook(instanceID, payload)
+					fmt.Printf("✓ Webhook dispatched for instance: %s\n", instanceID)
+				}
+
 			}
 
 		}
