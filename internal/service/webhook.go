@@ -2,6 +2,9 @@ package service
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -40,6 +43,15 @@ func SendIncomingMessageWebhook(instanceID string, data map[string]interface{}) 
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
+
+	// If webhook_secret is set, add HMAC signature header
+	if inst.WebhookSecret.Valid && inst.WebhookSecret.String != "" {
+		mac := hmac.New(sha256.New, []byte(inst.WebhookSecret.String))
+		mac.Write(body)
+		signature := hex.EncodeToString(mac.Sum(nil))
+
+		req.Header.Set("X-SUDEVWA-Signature", signature)
+	}
 
 	client := &http.Client{Timeout: 5 * time.Second}
 	go func() {

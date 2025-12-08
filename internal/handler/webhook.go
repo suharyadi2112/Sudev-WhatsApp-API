@@ -2,6 +2,8 @@
 package handler
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"net/http"
 
 	"gowa-yourself/internal/model"
@@ -34,14 +36,39 @@ func SetWebhookConfig(c echo.Context) error {
 			"Field 'url' is required", "VALIDATION_ERROR", "")
 	}
 
-	// validasi URL minimal ada http
+	// minimal check for http/https
 	if !(len(req.URL) > 7 && (req.URL[:7] == "http://" || req.URL[:8] == "https://")) {
 		return ErrorResponse(c, http.StatusBadRequest,
 			"webhook url must start with http:// or https://", "INVALID_URL", "")
 	}
 
-	// Update ke DB
-	if err := model.UpdateInstanceWebhook(instanceID, req.URL, req.Secret); err != nil {
+	// get current instance (to know existing secret)
+	inst, err := model.GetInstanceByInstanceID(instanceID)
+	if err != nil {
+		return ErrorResponse(c, http.StatusNotFound,
+			"Instance not found", "INSTANCE_NOT_FOUND", "")
+	}
+
+	effectiveSecret := req.Secret
+
+	// if client does not provide secret, generate or reuse existing
+	if effectiveSecret == "" {
+		if !inst.WebhookSecret.Valid || inst.WebhookSecret.String == "" {
+			// generate new random secret (32 bytes -> 64 hex chars)
+			b := make([]byte, 32)
+			if _, err := rand.Read(b); err != nil {
+				return ErrorResponse(c, http.StatusInternalServerError,
+					"Failed to generate webhook secret", "WEBHOOK_SECRET_GENERATION_FAILED", err.Error())
+			}
+			effectiveSecret = hex.EncodeToString(b)
+		} else {
+			// reuse existing secret
+			effectiveSecret = inst.WebhookSecret.String
+		}
+	}
+
+	// Update DB with url + effectiveSecret
+	if err := model.UpdateInstanceWebhook(instanceID, req.URL, effectiveSecret); err != nil {
 		if err.Error() == "instance_not_found" {
 			return ErrorResponse(c, http.StatusNotFound,
 				"Instance not found", "INSTANCE_NOT_FOUND", "")
@@ -54,6 +81,6 @@ func SetWebhookConfig(c echo.Context) error {
 	return SuccessResponse(c, http.StatusOK, "Webhook config updated", map[string]interface{}{
 		"instanceId": instanceID,
 		"webhookUrl": req.URL,
-		"hasSecret":  req.Secret != "",
+		"secret":     effectiveSecret, // user must store this securely
 	})
 }
