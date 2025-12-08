@@ -4,6 +4,9 @@ import (
 	"os"
 )
 
+var EnableWebsocket bool
+var EnableWebhook bool
+
 type Config struct {
 	Port               string
 	DBConnectionString string

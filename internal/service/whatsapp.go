@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"gowa-yourself/config"
 	"gowa-yourself/database"
-	"gowa-yourself/internal/config"
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/model"
 

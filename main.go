@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"gowa-yourself/config"
 	"gowa-yourself/database"
-	"gowa-yourself/internal/config"
 	"gowa-yourself/internal/handler"
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/service"
@@ -22,9 +22,6 @@ import (
 
 	"gowa-yourself/internal/ws"
 )
-
-var enableWebsocket bool
-var enableWebhook bool
 
 func main() {
 
