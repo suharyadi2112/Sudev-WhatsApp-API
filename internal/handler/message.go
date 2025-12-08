@@ -3,6 +3,10 @@ package handler
 import (
 	"context"
 	"errors"
+	"math/rand"
+	"os"
+	"strconv"
+	"time"
 
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/service"
@@ -11,6 +15,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/types"
 )
 
 // Request body untuk send message
@@ -67,6 +72,29 @@ func SendMessage(c echo.Context) error {
 		return ErrorResponse(c, 400, "Phone number is not registered on WhatsApp", "PHONE_NOT_REGISTERED",
 			"Please check the number or ask recipient to install WhatsApp")
 	}
+
+	//env delay
+	minDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MIN")
+	maxDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MAX")
+
+	if minDelayStr != "" && maxDelayStr != "" {
+		min, _ := strconv.Atoi(minDelayStr)
+		max, _ := strconv.Atoi(maxDelayStr)
+
+		if max >= min && min > 0 {
+			// Generate random delay
+			delaySeconds := rand.Intn(max-min+1) + min
+
+			// Kirim status Typing
+			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+
+			// Tunggu
+			time.Sleep(time.Duration(delaySeconds) * time.Second)
+		}
+	}
+
+	// (Optional) Kirim "Paused"
+	// _ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
 
 	msg := &waE2E.Message{
 		Conversation: &req.Message,
@@ -140,6 +168,29 @@ func SendMessageByNumber(c echo.Context) error {
 		return ErrorResponse(c, 400, "Phone number is not registered on WhatsApp", "PHONE_NOT_REGISTERED",
 			"Please check the number or ask recipient to install WhatsApp")
 	}
+
+	//env delay
+	minDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MIN")
+	maxDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MAX")
+
+	if minDelayStr != "" && maxDelayStr != "" {
+		min, _ := strconv.Atoi(minDelayStr)
+		max, _ := strconv.Atoi(maxDelayStr)
+
+		if max >= min && min > 0 {
+			// Generate random delay
+			delaySeconds := rand.Intn(max-min+1) + min
+
+			// Kirim status Typing
+			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+
+			// Tunggu
+			time.Sleep(time.Duration(delaySeconds) * time.Second)
+		}
+	}
+
+	// (Optional) Kirim "Paused"
+	// _ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
 
 	// 5) Kirim pesan
 	msg := &waE2E.Message{

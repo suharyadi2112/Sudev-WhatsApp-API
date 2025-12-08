@@ -5,6 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
+	"os"
+	"strconv"
+	"time"
 
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/model"
@@ -12,6 +16,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/types"
 )
 
 // Request body untuk send media from URL
@@ -118,6 +123,29 @@ func SendMediaFile(c echo.Context) error {
 		return ErrorResponse(c, 500, "Failed to upload media", "UPLOAD_FAILED",
 			fmt.Sprintf("Type: %s, Size: %d bytes, Error: %v", mediaType, len(fileData), err))
 	}
+
+	//env delay
+	minDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MIN")
+	maxDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MAX")
+
+	if minDelayStr != "" && maxDelayStr != "" {
+		min, _ := strconv.Atoi(minDelayStr)
+		max, _ := strconv.Atoi(maxDelayStr)
+
+		if max >= min && min > 0 {
+			// Generate random delay
+			delaySeconds := rand.Intn(max-min+1) + min
+
+			// Kirim status Typing
+			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+
+			// Tunggu
+			time.Sleep(time.Duration(delaySeconds) * time.Second)
+		}
+	}
+
+	// (Optional) Kirim "Paused"
+	// _ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
 
 	// 12. CREATE MESSAGE
 	msg := helper.CreateMediaMessage(uploaded, caption, file.Filename, mediaType)
@@ -235,6 +263,29 @@ func SendMediaURL(c echo.Context) error {
 			fmt.Sprintf("File: %s, Size: %d bytes, Type: %s, Error: %v", filename, len(fileData), mediaType, err))
 	}
 
+	//env delay
+	minDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MIN")
+	maxDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MAX")
+
+	if minDelayStr != "" && maxDelayStr != "" {
+		min, _ := strconv.Atoi(minDelayStr)
+		max, _ := strconv.Atoi(maxDelayStr)
+
+		if max >= min && min > 0 {
+			// Generate random delay
+			delaySeconds := rand.Intn(max-min+1) + min
+
+			// Kirim status Typing
+			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+
+			// Tunggu
+			time.Sleep(time.Duration(delaySeconds) * time.Second)
+		}
+	}
+
+	// (Optional) Kirim "Paused"
+	// _ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
+
 	// 12. CREATE MESSAGE
 	msg := helper.CreateMediaMessage(uploaded, req.Caption, filename, mediaType)
 
@@ -344,6 +395,29 @@ func SendMediaURLByNumber(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to upload media to WhatsApp", "UPLOAD_FAILED", fmt.Sprintf("File: %s, Size: %d bytes, Type: %s, Error: %v", filename, len(fileData), mediaType, err))
 	}
+
+	//env delay
+	minDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MIN")
+	maxDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MAX")
+
+	if minDelayStr != "" && maxDelayStr != "" {
+		min, _ := strconv.Atoi(minDelayStr)
+		max, _ := strconv.Atoi(maxDelayStr)
+
+		if max >= min && min > 0 {
+			// Generate random delay
+			delaySeconds := rand.Intn(max-min+1) + min
+
+			// Kirim status Typing
+			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+
+			// Tunggu
+			time.Sleep(time.Duration(delaySeconds) * time.Second)
+		}
+	}
+
+	// (Optional) Kirim "Paused"
+	// _ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
 
 	msg := helper.CreateMediaMessage(uploaded, req.Caption, filename, mediaType)
 
@@ -466,6 +540,29 @@ func SendMediaFileByNumber(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to upload media", "UPLOAD_FAILED", fmt.Sprintf("Type: %s, Size: %d bytes, Error: %v", mediaType, len(fileData), err))
 	}
+
+	//env delay
+	minDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MIN")
+	maxDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MAX")
+
+	if minDelayStr != "" && maxDelayStr != "" {
+		min, _ := strconv.Atoi(minDelayStr)
+		max, _ := strconv.Atoi(maxDelayStr)
+
+		if max >= min && min > 0 {
+			// Generate random delay
+			delaySeconds := rand.Intn(max-min+1) + min
+
+			// Kirim status Typing
+			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+
+			// Tunggu
+			time.Sleep(time.Duration(delaySeconds) * time.Second)
+		}
+	}
+
+	// (Optional) Kirim "Paused"
+	// _ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
 
 	// 13. CREATE MESSAGE
 	msg := helper.CreateMediaMessage(uploaded, caption, file.Filename, mediaType)
