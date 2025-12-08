@@ -1,4 +1,4 @@
-# 📱 SUDEVWA - WhatsApp Multi-Instance API (Go/Golang)
+# SUDEVWA - WhatsApp Multi-Instance API (Go/Golang)
 
 > **WhatsApp Automation API** | **Multi-Device Management** | **Real-time WebSocket** | **Go + Echo + Whatsmeow**
 
