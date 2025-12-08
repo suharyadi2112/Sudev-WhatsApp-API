@@ -38,7 +38,7 @@ WhatsApp API, WhatsApp Bot, Multi-instance WhatsApp, WhatsApp Automation, Go Wha
 ### API Reference
 
 ```
-- https://soqnnmoe17.apidog.io/
+https://soqnnmoe17.apidog.io/
 ```
 
 ### Global WebSocket - System Events
@@ -87,6 +87,50 @@ Authorization: Bearer {token}
   }
 }
 ```
+
+### 📡 Incoming Message Webhook (Beta)
+- Optional HTTP webhook for incoming WhatsApp messages  
+- Configurable per instance via REST API  
+- Shared payload format with WebSocket `incoming_message` event  
+
+### Enable via ENV
+```
+SUDEVWA_ENABLE_WEBSOCKET=true
+SUDEVWA_ENABLE_WEBHOOK=true
+```
+If this variable is not set, or set to anything other than `true`, webhooks will not be sent.
+
+### Configure Webhook per Instance
+```
+POST /api/instances/:instanceId/webhook
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+Example body:
+```
+{
+"url": "https://your-app.com/wa-webhook",
+"secret": "OPTIONAL_SECRET_KEY"
+}
+```
+Webhook Payload
+```
+{
+"event": "incoming_message",
+"timestamp": "2025-12-08T13:57:04.147255Z",
+"data": {
+"instance_id": "instance123",
+"from": "6281234567890@s.whatsapp.net",
+"from_me": false,
+"message": "Hello World",
+"timestamp": 1733587980,
+"is_group": false,
+"message_id": "3EB0ABC123DEF456",
+"push_name": "John Doe"
+}
+```
+
 
 ## ⚠️ Disclaimer
 For educational/research purposes only. Use at your own risk.
