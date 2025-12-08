@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
+	"gowa-yourself/config"
 	"gowa-yourself/database"
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/model"
@@ -19,6 +21,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"go.mau.fi/whatsmeow"
+	waProto "go.mau.fi/whatsmeow/proto/waCompanionReg"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 )
@@ -217,40 +220,59 @@ func eventHandler(instanceID string) func(evt interface{}) {
 
 		//Handle incoming messages
 		case *events.Message:
-			fmt.Printf("📨 Received message from %s: %s\n", v.Info.Sender, v.Message.GetConversation())
+			msgTime := v.Info.Timestamp
 
-			// Broadcast ke WebSocket listener
-			if Realtime != nil {
-				messageText := v.Message.GetConversation()
+			// Filter pesan lama (History Sync)
+			// Jika pesan lebih tua dari 2 menit, skip
+			if time.Since(msgTime) > 2*time.Minute {
+				// fmt.Println("Ignoring old message from history sync")
+				return
+			}
 
-				// Handle extended text message (reply, link preview, etc)
-				if messageText == "" && v.Message.ExtendedTextMessage != nil {
-					messageText = v.Message.GetExtendedTextMessage().GetText()
-				}
+			messageText := v.Message.GetConversation()
 
-				// Handle image caption
-				if messageText == "" && v.Message.ImageMessage != nil {
-					messageText = v.Message.GetImageMessage().GetCaption()
-				}
+			// Handle extended text message (reply, link preview, etc)
+			if messageText == "" && v.Message.ExtendedTextMessage != nil {
+				messageText = v.Message.GetExtendedTextMessage().GetText()
+			}
 
-				// Handle video caption
-				if messageText == "" && v.Message.VideoMessage != nil {
-					messageText = v.Message.GetVideoMessage().GetCaption()
-				}
+			// Handle image caption
+			if messageText == "" && v.Message.ImageMessage != nil {
+				messageText = v.Message.GetImageMessage().GetCaption()
+			}
 
+			// Handle video caption
+			if messageText == "" && v.Message.VideoMessage != nil {
+				messageText = v.Message.GetVideoMessage().GetCaption()
+			}
+
+			fmt.Printf("📨 Received message from %s: %s\n", v.Info.Sender, messageText)
+
+			// Siapkan Payload (dipakai WS & Webhook)
+			payload := map[string]interface{}{
+				"instance_id": instanceID,
+				"from":        v.Info.Sender.String(),
+				"from_me":     v.Info.IsFromMe,
+				"message":     messageText,
+				"timestamp":   v.Info.Timestamp.Unix(),
+				"is_group":    v.Info.IsGroup,
+				"message_id":  v.Info.ID,
+				"push_name":   v.Info.PushName,
+			}
+
+			// Broadcast ke WebSocket (jika diaktifkan)
+			if config.EnableWebsocket && Realtime != nil {
 				Realtime.BroadcastToInstance(instanceID, map[string]interface{}{
-					"event":       "incoming_message",
-					"instance_id": instanceID,
-					"from":        v.Info.Sender.String(),
-					"from_me":     v.Info.IsFromMe,
-					"message":     messageText,
-					"timestamp":   v.Info.Timestamp.Unix(),
-					"is_group":    v.Info.IsGroup,
-					"message_id":  v.Info.ID,
-					"push_name":   v.Info.PushName,
+					"event": "incoming_message",
+					"data":  payload,
 				})
-
 				fmt.Printf("✓ Message broadcasted to WebSocket listeners for instance: %s\n", instanceID)
+			}
+
+			//Broadcast ke Webhook (jika diaktifkan)
+			if config.EnableWebhook {
+				SendIncomingMessageWebhook(instanceID, payload)
+				fmt.Printf("✓ Webhook dispatched for instance: %s\n", instanceID)
 			}
 
 		}
@@ -336,8 +358,20 @@ func CreateSession(instanceID string) (*model.Session, error) {
 		return nil, fmt.Errorf("session already exists")
 	}
 
-	// 🔥 Set device name SEBELUM create device (ini global setting)
-	store.DeviceProps.Os = proto.String("SUDEVWA Beta")
+	// Acak OS supaya tidak seragam
+	osOptions := []string{"Windows", "macOS", "Linux"}
+	randomOS := osOptions[rand.Intn(len(osOptions))]
+
+	// Generate random suffix (4 digit hex) untuk identitas unik
+	randomID := fmt.Sprintf("%04x", rand.Intn(0xffff))
+
+	// Gabungkan OS dengan nama unik: "Windows (SUDEVWA-a1b2)"
+	customOsName := fmt.Sprintf("%s (SUDEVWA-%s)", randomOS, randomID)
+
+	// Set Global Device Props (akan dipake NewDevice)
+	store.DeviceProps.Os = proto.String(customOsName)
+	store.DeviceProps.PlatformType = waProto.DeviceProps_DESKTOP.Enum()
+	store.DeviceProps.RequireFullSync = proto.Bool(false)
 
 	// Buat device baru
 	deviceStore := database.Container.NewDevice()

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"gowa-yourself/config"
 	"gowa-yourself/database"
 	"gowa-yourself/internal/handler"
 	"gowa-yourself/internal/helper"
@@ -40,6 +41,15 @@ func main() {
 		log.Fatal("APP_DATABASE_URL is not set")
 	}
 	database.InitAppDB(appDbURL)
+
+	// feature flags (WEBHOOK & WEBSOCKET)
+	wsEnv := strings.ToLower(os.Getenv("SUDEVWA_ENABLE_WEBSOCKET"))
+	webhookEnv := strings.ToLower(os.Getenv("SUDEVWA_ENABLE_WEBHOOK"))
+
+	config.EnableWebsocket = (wsEnv == "true")
+	config.EnableWebhook = (webhookEnv == "true")
+
+	log.Printf("feature flags -> websocket: %v, webhook: %v", config.EnableWebsocket, config.EnableWebhook)
 
 	//jwt
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -181,9 +191,6 @@ func main() {
 	api.DELETE("/instances/:instanceId", handler.DeleteInstance)
 	api.DELETE("/qr-cancel/:instanceId", handler.CancelQR)
 
-	//dapatkan pesan masuk, pakai ws
-	api.GET("/listen/:instanceId", handler.ListenMessages(hub))
-
 	// ambil semua instance
 	api.GET("/instances", handler.GetAllInstances)
 
@@ -213,6 +220,14 @@ func main() {
 
 	//get info akun
 	api.GET("/info-device/:instanceId", handler.GetDeviceInfo)
+
+	//----------------------------
+	// WEBSOCKET DAN WEBHOOK
+	//----------------------------
+	//dapatkan pesan masuk, pakai ws
+	api.GET("/listen/:instanceId", handler.ListenMessages(hub))
+	//webhook
+	api.POST("/instances/:instanceId/webhook-setconfig", handler.SetWebhookConfig)
 
 	port := os.Getenv("PORT")
 	if port == "" {

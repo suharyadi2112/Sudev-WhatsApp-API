@@ -31,6 +31,8 @@ type Instance struct {
 	LastSeen        sql.NullTime
 	SessionData     []byte
 	Circle          string
+	WebhookURL      sql.NullString
+	WebhookSecret   sql.NullString
 }
 
 type InstanceResp struct {
@@ -362,7 +364,9 @@ func GetInstanceByInstanceID(instanceID string) (*Instance, error) {
             connected_at,
             disconnected_at,
             last_seen,
-            session_data
+            session_data,
+			webhook_url,
+			webhook_secret
         FROM instances
         WHERE instance_id = $1
         LIMIT 1
@@ -404,6 +408,8 @@ func GetInstanceByInstanceID(instanceID string) (*Instance, error) {
 		&disconnectedAtNT,
 		&lastSeenNT,
 		&inst.SessionData,
+		&inst.WebhookURL,
+		&inst.WebhookSecret,
 	)
 	if err != nil {
 		return nil, err

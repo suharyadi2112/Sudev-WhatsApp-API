@@ -5,6 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
+	"os"
+	"strconv"
+	"time"
 
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/model"
@@ -104,6 +108,29 @@ func SendGroupMessage(c echo.Context) error {
 		return ErrorResponse(c, 400, "Not a group JID", "NOT_GROUP_JID", "Group JID must end with @g.us")
 	}
 
+	//env delay
+	minDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MIN")
+	maxDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MAX")
+
+	if minDelayStr != "" && maxDelayStr != "" {
+		min, _ := strconv.Atoi(minDelayStr)
+		max, _ := strconv.Atoi(maxDelayStr)
+
+		if max >= min && min > 0 {
+			// Generate random delay
+			delaySeconds := rand.Intn(max-min+1) + min
+
+			// Kirim status Typing
+			_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+
+			// Tunggu
+			time.Sleep(time.Duration(delaySeconds) * time.Second)
+		}
+	}
+
+	// (Optional) Kirim "Paused"
+	// _ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
+
 	// Create message
 	msg := &waE2E.Message{
 		Conversation: &req.Message,
@@ -202,6 +229,29 @@ func SendGroupMedia(c echo.Context) error {
 		return ErrorResponse(c, 500, "Failed to upload media", "UPLOAD_FAILED", err.Error())
 	}
 
+	//env delay
+	minDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MIN")
+	maxDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MAX")
+
+	if minDelayStr != "" && maxDelayStr != "" {
+		min, _ := strconv.Atoi(minDelayStr)
+		max, _ := strconv.Atoi(maxDelayStr)
+
+		if max >= min && min > 0 {
+			// Generate random delay
+			delaySeconds := rand.Intn(max-min+1) + min
+
+			// Kirim status Typing
+			_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+
+			// Tunggu
+			time.Sleep(time.Duration(delaySeconds) * time.Second)
+		}
+	}
+
+	// (Optional) Kirim "Paused"
+	// _ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
+
 	msg := helper.CreateMediaMessage(uploaded, caption, file.Filename, mediaType)
 
 	resp, err := session.Client.SendMessage(context.Background(), groupJID, msg)
@@ -296,6 +346,29 @@ func SendGroupMediaURL(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to upload media", "UPLOAD_FAILED", err.Error())
 	}
+
+	//env delay
+	minDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MIN")
+	maxDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MAX")
+
+	if minDelayStr != "" && maxDelayStr != "" {
+		min, _ := strconv.Atoi(minDelayStr)
+		max, _ := strconv.Atoi(maxDelayStr)
+
+		if max >= min && min > 0 {
+			// Generate random delay
+			delaySeconds := rand.Intn(max-min+1) + min
+
+			// Kirim status Typing
+			_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+
+			// Tunggu
+			time.Sleep(time.Duration(delaySeconds) * time.Second)
+		}
+	}
+
+	// (Optional) Kirim "Paused"
+	// _ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
 
 	msg := helper.CreateMediaMessage(uploaded, req.Caption, filename, mediaType)
 
@@ -414,6 +487,29 @@ func SendGroupMessageByNumber(c echo.Context) error {
 		return ErrorResponse(c, 400, "Not a group JID", "NOT_GROUP_JID", "Group JID must end with @g.us")
 	}
 
+	//env delay
+	minDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MIN")
+	maxDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MAX")
+
+	if minDelayStr != "" && maxDelayStr != "" {
+		min, _ := strconv.Atoi(minDelayStr)
+		max, _ := strconv.Atoi(maxDelayStr)
+
+		if max >= min && min > 0 {
+			// Generate random delay
+			delaySeconds := rand.Intn(max-min+1) + min
+
+			// Kirim status Typing
+			_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+
+			// Tunggu
+			time.Sleep(time.Duration(delaySeconds) * time.Second)
+		}
+	}
+
+	// (Optional) Kirim "Paused"
+	// _ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
+
 	// Create message
 	msg := &waE2E.Message{
 		Conversation: &req.Message,
@@ -522,6 +618,29 @@ func SendGroupMediaByNumber(c echo.Context) error {
 		return ErrorResponse(c, 500, "Failed to upload media", "UPLOAD_FAILED", err.Error())
 	}
 
+	//env delay
+	minDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MIN")
+	maxDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MAX")
+
+	if minDelayStr != "" && maxDelayStr != "" {
+		min, _ := strconv.Atoi(minDelayStr)
+		max, _ := strconv.Atoi(maxDelayStr)
+
+		if max >= min && min > 0 {
+			// Generate random delay
+			delaySeconds := rand.Intn(max-min+1) + min
+
+			// Kirim status Typing
+			_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+
+			// Tunggu
+			time.Sleep(time.Duration(delaySeconds) * time.Second)
+		}
+	}
+
+	// (Optional) Kirim "Paused"
+	// _ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
+
 	msg := helper.CreateMediaMessage(uploaded, caption, file.Filename, mediaType)
 
 	resp, err := session.Client.SendMessage(context.Background(), groupJID, msg)
@@ -626,6 +745,29 @@ func SendGroupMediaURLByNumber(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to upload media", "UPLOAD_FAILED", err.Error())
 	}
+
+	//env delay
+	minDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MIN")
+	maxDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MAX")
+
+	if minDelayStr != "" && maxDelayStr != "" {
+		min, _ := strconv.Atoi(minDelayStr)
+		max, _ := strconv.Atoi(maxDelayStr)
+
+		if max >= min && min > 0 {
+			// Generate random delay
+			delaySeconds := rand.Intn(max-min+1) + min
+
+			// Kirim status Typing
+			_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+
+			// Tunggu
+			time.Sleep(time.Duration(delaySeconds) * time.Second)
+		}
+	}
+
+	// (Optional) Kirim "Paused"
+	// _ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
 
 	msg := helper.CreateMediaMessage(uploaded, req.Caption, filename, mediaType)
 
