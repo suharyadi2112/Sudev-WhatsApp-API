@@ -211,13 +211,19 @@ func (h *Hub) BroadcastToInstance(instanceID string, data map[string]interface{}
 		Data:      data,
 	}
 
+	// ✅ FIX: Tambahkan RLock untuk prevent race condition
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
 	for client := range h.clients {
 		if client.InstanceID == instanceID {
 			select {
 			case client.send <- event:
+				// Sukses kirim event ke client
 			default:
-				close(client.send)
-				delete(h.clients, client)
+				// ✅ FIX: Jangan delete di sini untuk avoid modifying map during iteration
+				// Biarkan Hub.Run() yang handle cleanup client yang bermasalah
+				log.Printf("⚠️ Client buffer full for instance: %s", instanceID)
 			}
 		}
 	}

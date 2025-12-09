@@ -1,10 +1,15 @@
 package model
 
-import "go.mau.fi/whatsmeow"
+import (
+	"context"
+
+	"go.mau.fi/whatsmeow"
+)
 
 type Session struct {
-	ID          string
-	JID         string
-	Client      *whatsmeow.Client
-	IsConnected bool
+	ID              string
+	JID             string
+	Client          *whatsmeow.Client
+	IsConnected     bool
+	HeartbeatCancel context.CancelFunc // ✅ FIX: Untuk stop heartbeat goroutine (exported)
 }

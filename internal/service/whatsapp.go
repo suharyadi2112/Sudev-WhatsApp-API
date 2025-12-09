@@ -108,28 +108,46 @@ func eventHandler(instanceID string) func(evt interface{}) {
 					Realtime.Publish(evt)
 				}
 
-				//Start heartbeat goroutine
-				go func(instID string) {
+				// ✅ FIX: Stop heartbeat lama jika ada (prevent multiple goroutines)
+				if session.HeartbeatCancel != nil {
+					session.HeartbeatCancel()
+					fmt.Println("⏹ Stopped previous heartbeat for:", instanceID)
+				}
+
+				// ✅ FIX: Start heartbeat goroutine dengan context cancellation
+				ctx, cancel := context.WithCancel(context.Background())
+				session.HeartbeatCancel = cancel // Simpan cancel function
+
+				go func(ctx context.Context, instID string) {
 					ticker := time.NewTicker(5 * time.Minute)
 					defer ticker.Stop()
 
-					for range ticker.C {
-						sessionsLock.RLock()
-						sess, ok := sessions[instID]
-						sessionsLock.RUnlock()
+					for {
+						select {
+						case <-ctx.Done():
+							// Context cancelled - stop goroutine
+							fmt.Println("⏹ Heartbeat stopped (cancelled) for:", instID)
+							return
 
-						if !ok || !sess.IsConnected {
-							fmt.Println("⏹ Stopping heartbeat for:", instID)
-							return // Stop kalau instance sudah disconnect
-						}
+						case <-ticker.C:
+							// Send heartbeat
+							sessionsLock.RLock()
+							sess, ok := sessions[instID]
+							sessionsLock.RUnlock()
 
-						if err := sess.Client.SendPresence(context.Background(), types.PresenceAvailable); err != nil {
-							fmt.Println("⚠ Heartbeat failed for:", instID, err)
-						} else {
-							fmt.Println("💓 Heartbeat sent for:", instID)
+							if !ok || !sess.IsConnected {
+								fmt.Println("⏹ Heartbeat stopped (disconnected) for:", instID)
+								return
+							}
+
+							if err := sess.Client.SendPresence(context.Background(), types.PresenceAvailable); err != nil {
+								fmt.Println("⚠ Heartbeat failed for:", instID, err)
+							} else {
+								fmt.Println("💓 Heartbeat sent for:", instID)
+							}
 						}
 					}
-				}(instanceID)
+				}(ctx, instanceID)
 
 			}
 
@@ -442,6 +460,12 @@ func DeleteSession(instanceID string) error {
 	// Hapus dari map sessions (memory)
 	delete(sessions, instanceID)
 	sessionsLock.Unlock()
+
+	// ✅ FIX: Stop heartbeat goroutine sebelum logout
+	if session.HeartbeatCancel != nil {
+		session.HeartbeatCancel()
+		fmt.Printf("⏹ Heartbeat cancelled for instance: %s\n", instanceID)
+	}
 
 	// LOGOUT: Unlink device dari WhatsApp
 	if session.Client != nil {

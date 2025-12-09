@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"gowa-yourself/internal/model"
+	"gowa-yourself/internal/service" // ✅ FIX: Tambahkan import
 
 	"github.com/labstack/echo/v4"
 )
@@ -77,6 +78,9 @@ func SetWebhookConfig(c echo.Context) error {
 		return ErrorResponse(c, http.StatusInternalServerError,
 			"Failed to update webhook config", "WEBHOOK_UPDATE_FAILED", err.Error())
 	}
+
+	// ✅ FIX: Invalidate cache setelah update webhook config
+	service.InvalidateWebhookCache(instanceID)
 
 	return SuccessResponse(c, http.StatusOK, "Webhook config updated", map[string]interface{}{
 		"instanceId": instanceID,
