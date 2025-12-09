@@ -11,6 +11,7 @@ import (
 	"gowa-yourself/config"
 	"gowa-yourself/database"
 	"gowa-yourself/internal/handler"
+	warmingHandler "gowa-yourself/internal/handler/warming"
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/service"
 
@@ -228,6 +229,16 @@ func main() {
 	api.GET("/listen/:instanceId", handler.ListenMessages(hub))
 	//webhook
 	api.POST("/instances/:instanceId/webhook-setconfig", handler.SetWebhookConfig)
+
+	//----------------------------
+	// WARMING SYSTEM
+	//----------------------------
+	warming := api.Group("/warming")
+	warming.POST("/scripts", warmingHandler.CreateWarmingScript)
+	warming.GET("/scripts", warmingHandler.GetAllWarmingScripts)
+	warming.GET("/scripts/:id", warmingHandler.GetWarmingScriptByID)
+	warming.PUT("/scripts/:id", warmingHandler.UpdateWarmingScript)
+	warming.DELETE("/scripts/:id", warmingHandler.DeleteWarmingScript)
 
 	port := os.Getenv("PORT")
 	if port == "" {
