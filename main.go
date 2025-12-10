@@ -14,6 +14,7 @@ import (
 	warmingHandler "gowa-yourself/internal/handler/warming"
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/service"
+	"gowa-yourself/internal/worker"
 
 	"github.com/joho/godotenv"
 	echojwt "github.com/labstack/echo-jwt/v4"
@@ -240,9 +241,45 @@ func main() {
 	warming.PUT("/scripts/:id", warmingHandler.UpdateWarmingScript)
 	warming.DELETE("/scripts/:id", warmingHandler.DeleteWarmingScript)
 
+	// Script Lines (Dialog/Naskah)
+	warming.POST("/scripts/:scriptId/lines", warmingHandler.CreateWarmingScriptLine)
+	warming.GET("/scripts/:scriptId/lines", warmingHandler.GetAllWarmingScriptLines)
+	warming.GET("/scripts/:scriptId/lines/:id", warmingHandler.GetWarmingScriptLineByID)
+	warming.PUT("/scripts/:scriptId/lines/:id", warmingHandler.UpdateWarmingScriptLine)
+	warming.DELETE("/scripts/:scriptId/lines/:id", warmingHandler.DeleteWarmingScriptLine)
+	warming.POST("/scripts/:scriptId/lines/generate", warmingHandler.GenerateWarmingScriptLines)
+
+	// Templates (Manage Conversation Templates)
+	warming.POST("/templates", warmingHandler.CreateWarmingTemplate)
+	warming.GET("/templates", warmingHandler.GetAllWarmingTemplates)
+	warming.GET("/templates/:id", warmingHandler.GetWarmingTemplateByID)
+	warming.PUT("/templates/:id", warmingHandler.UpdateWarmingTemplate)
+	warming.DELETE("/templates/:id", warmingHandler.DeleteWarmingTemplate)
+
+	// Rooms (Execution Management)
+	warming.POST("/rooms", warmingHandler.CreateWarmingRoom)
+	warming.GET("/rooms", warmingHandler.GetAllWarmingRooms)
+	warming.GET("/rooms/:id", warmingHandler.GetWarmingRoomByID)
+	warming.PUT("/rooms/:id", warmingHandler.UpdateWarmingRoom)
+	warming.DELETE("/rooms/:id", warmingHandler.DeleteWarmingRoom)
+	warming.PATCH("/rooms/:id/status", warmingHandler.UpdateRoomStatus)
+	warming.POST("/rooms/:id/restart", warmingHandler.RestartWarmingRoom)
+
+	// Logs (Execution History - Read Only)
+	warming.GET("/logs", warmingHandler.GetAllWarmingLogs)
+	warming.GET("/logs/:id", warmingHandler.GetWarmingLogByID)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "2121" // default aman
+	}
+
+	// Start warming worker if enabled
+	if os.Getenv("WARMING_WORKER_ENABLED") == "true" {
+		log.Println("🚀 Starting Warming Worker...")
+		go worker.StartWarmingWorker()
+	} else {
+		log.Println("⏸️  Warming Worker disabled (set WARMING_WORKER_ENABLED=true to enable)")
 	}
 
 	baseURL := os.Getenv("BASEURL")
