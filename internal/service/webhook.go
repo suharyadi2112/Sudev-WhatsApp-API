@@ -8,9 +8,24 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"gowa-yourself/internal/model"
+)
+
+// ✅ FIX: Tambahkan struct untuk webhook config dengan TTL
+type WebhookConfig struct {
+	URL       string
+	Secret    string
+	ExpiresAt time.Time // ← Tambahkan expiry time
+}
+
+// ✅ FIX: Cache untuk webhook config (menghindari N+1 query)
+var (
+	webhookCache      = make(map[string]*WebhookConfig)
+	webhookCacheMutex sync.RWMutex
+	webhookCacheTTL   = 5 * time.Minute // Cache valid selama 5 menit
 )
 
 type WebhookPayload struct {
@@ -19,9 +34,53 @@ type WebhookPayload struct {
 	Data      interface{} `json:"data"`
 }
 
-func SendIncomingMessageWebhook(instanceID string, data map[string]interface{}) {
+// ✅ FIX: Function untuk get webhook config dengan caching + TTL
+func GetWebhookConfig(instanceID string) (*WebhookConfig, error) {
+	// Cek cache dulu
+	webhookCacheMutex.RLock()
+	config, exists := webhookCache[instanceID]
+	webhookCacheMutex.RUnlock()
+
+	// ✅ IMPROVEMENT: Cek apakah cache masih valid (belum expired)
+	if exists && config != nil && time.Now().Before(config.ExpiresAt) {
+		return config, nil
+	}
+
+	// Cache miss atau expired - load dari DB
 	inst, err := model.GetInstanceByInstanceID(instanceID)
-	if err != nil || !inst.WebhookURL.Valid || inst.WebhookURL.String == "" {
+	if err != nil {
+		return nil, err
+	}
+
+	// Buat config object dengan expiry time
+	config = &WebhookConfig{
+		URL:       inst.WebhookURL.String,
+		Secret:    inst.WebhookSecret.String,
+		ExpiresAt: time.Now().Add(webhookCacheTTL), // ← Set expiry
+	}
+
+	// Simpan ke cache
+	webhookCacheMutex.Lock()
+	webhookCache[instanceID] = config
+	webhookCacheMutex.Unlock()
+
+	log.Printf("✅ Webhook config cached for instance: %s (expires in %v)", instanceID, webhookCacheTTL)
+	return config, nil
+}
+
+// ✅ FIX: Function untuk invalidate cache (dipanggil saat webhook config diupdate)
+func InvalidateWebhookCache(instanceID string) {
+	webhookCacheMutex.Lock()
+	delete(webhookCache, instanceID)
+	webhookCacheMutex.Unlock()
+	log.Printf("🗑️ Webhook cache invalidated for instance: %s", instanceID)
+}
+
+// ✅ FIX: Refactored function - sekarang pakai cache
+func SendIncomingMessageWebhook(instanceID string, data map[string]interface{}) {
+	// Get webhook config dari cache (bukan DB!)
+	config, err := GetWebhookConfig(instanceID)
+	if err != nil || config.URL == "" {
 		return
 	}
 
@@ -37,7 +96,7 @@ func SendIncomingMessageWebhook(instanceID string, data map[string]interface{}) 
 		return
 	}
 
-	req, err := http.NewRequest("POST", inst.WebhookURL.String, bytes.NewReader(body))
+	req, err := http.NewRequest("POST", config.URL, bytes.NewReader(body))
 	if err != nil {
 		log.Printf("webhook: new request error: %v", err)
 		return
@@ -45,8 +104,8 @@ func SendIncomingMessageWebhook(instanceID string, data map[string]interface{}) 
 	req.Header.Set("Content-Type", "application/json")
 
 	// If webhook_secret is set, add HMAC signature header
-	if inst.WebhookSecret.Valid && inst.WebhookSecret.String != "" {
-		mac := hmac.New(sha256.New, []byte(inst.WebhookSecret.String))
+	if config.Secret != "" {
+		mac := hmac.New(sha256.New, []byte(config.Secret))
 		mac.Write(body)
 		signature := hex.EncodeToString(mac.Sum(nil))
 
