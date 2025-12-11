@@ -73,28 +73,50 @@ func SendMessage(c echo.Context) error {
 			"Please check the number or ask recipient to install WhatsApp")
 	}
 
-	//env delay
+	// Simulasi typing yang lebih natural
+	messageLength := len(req.Message)
+	baseDelay := 2      // detik minimum
+	typingSpeed := 0.15 // detik per karakter (simulasi kecepatan mengetik)
+	calculatedDelay := baseDelay + int(float64(messageLength)*typingSpeed)
+
+	// Tambahkan variasi random ±20%
+	variation := rand.Intn(int(float64(calculatedDelay)*0.4)) - int(float64(calculatedDelay)*0.2)
+	finalDelay := calculatedDelay + variation
+
+	// Batasi delay (min 3 detik, max 30 detik)
+	if finalDelay > 30 {
+		finalDelay = 30
+	}
+	if finalDelay < 3 {
+		finalDelay = 3
+	}
+
+	// Override dengan env variable jika ada
 	minDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MIN")
 	maxDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MAX")
-
 	if minDelayStr != "" && maxDelayStr != "" {
 		min, _ := strconv.Atoi(minDelayStr)
 		max, _ := strconv.Atoi(maxDelayStr)
-
 		if max >= min && min > 0 {
-			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
-
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
-
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+			finalDelay = rand.Intn(max-min+1) + min
 		}
 	}
 
-	// (Optional) Kirim "Paused"
-	// _ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
+	// Kirim status Typing
+	_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+
+	// Tunggu sebagian waktu (70%)
+	time.Sleep(time.Duration(finalDelay*70/100) * time.Second)
+
+	// Pause sejenak (30% kemungkinan untuk pesan > 50 karakter)
+	if messageLength > 50 && rand.Intn(100) < 30 {
+		_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
+		time.Sleep(time.Duration(rand.Intn(2)+1) * time.Second)
+		_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+	}
+
+	// Tunggu sisa waktu (30%)
+	time.Sleep(time.Duration(finalDelay*30/100) * time.Second)
 
 	msg := &waE2E.Message{
 		Conversation: &req.Message,
@@ -169,28 +191,50 @@ func SendMessageByNumber(c echo.Context) error {
 			"Please check the number or ask recipient to install WhatsApp")
 	}
 
-	//env delay
+	// Simulasi typing yang lebih natural
+	messageLength := len(req.Message)
+	baseDelay := 2      // detik minimum
+	typingSpeed := 0.15 // detik per karakter (simulasi kecepatan mengetik)
+	calculatedDelay := baseDelay + int(float64(messageLength)*typingSpeed)
+
+	// Tambahkan variasi random ±20%
+	variation := rand.Intn(int(float64(calculatedDelay)*0.4)) - int(float64(calculatedDelay)*0.2)
+	finalDelay := calculatedDelay + variation
+
+	// Batasi delay (min 3 detik, max 30 detik)
+	if finalDelay > 30 {
+		finalDelay = 30
+	}
+	if finalDelay < 3 {
+		finalDelay = 3
+	}
+
+	// Override dengan env variable jika ada
 	minDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MIN")
 	maxDelayStr := os.Getenv("SUDEVWA_TYPING_DELAY_MAX")
-
 	if minDelayStr != "" && maxDelayStr != "" {
 		min, _ := strconv.Atoi(minDelayStr)
 		max, _ := strconv.Atoi(maxDelayStr)
-
 		if max >= min && min > 0 {
-			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
-
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
-
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+			finalDelay = rand.Intn(max-min+1) + min
 		}
 	}
 
-	// (Optional) Kirim "Paused"
-	// _ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
+	// Kirim status Typing
+	_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+
+	// Tunggu sebagian waktu (70%)
+	time.Sleep(time.Duration(finalDelay*70/100) * time.Second)
+
+	// Pause sejenak (30% kemungkinan untuk pesan > 50 karakter)
+	if messageLength > 50 && rand.Intn(100) < 30 {
+		_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresencePaused, types.ChatPresenceMediaText)
+		time.Sleep(time.Duration(rand.Intn(2)+1) * time.Second)
+		_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+	}
+
+	// Tunggu sisa waktu (30%)
+	time.Sleep(time.Duration(finalDelay*30/100) * time.Second)
 
 	// 5) Kirim pesan
 	msg := &waE2E.Message{
