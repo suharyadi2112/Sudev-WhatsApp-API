@@ -35,6 +35,12 @@ var (
 	loggingOutLock sync.RWMutex
 	Realtime       ws.RealtimePublisher
 
+	// Track reconnect untuk staggered activation
+	reconnectTracker     = make(map[string]time.Time) // instanceID -> waktu disconnect
+	reconnectTrackerLock sync.RWMutex
+	lastReconnectTime    time.Time
+	lastReconnectLock    sync.RWMutex
+
 	ErrInstanceNotFound       = errors.New("instance not found")
 	ErrInstanceStillConnected = errors.New("instance still connected")
 )
@@ -53,6 +59,32 @@ func eventHandler(instanceID string) func(evt interface{}) {
 				return
 			}
 
+			// Cek apakah ini reconnect setelah disconnect
+			reconnectTrackerLock.Lock()
+			disconnectTime, wasDisconnected := reconnectTracker[instanceID]
+			delete(reconnectTracker, instanceID) // Hapus dari tracker
+			reconnectTrackerLock.Unlock()
+
+			// Hitung delay untuk staggered activation
+			var activationDelay time.Duration
+			if wasDisconnected {
+				// Cek apakah ada device lain yang baru reconnect
+				lastReconnectLock.Lock()
+				timeSinceLastReconnect := time.Since(lastReconnectTime)
+
+				// Jika ada device lain reconnect dalam 5 detik terakhir,
+				// berarti kemungkinan internet baru pulih (mass reconnect)
+				if timeSinceLastReconnect < 5*time.Second && !lastReconnectTime.IsZero() {
+					// Tambahkan delay 3-8 detik untuk device ini
+					activationDelay = time.Duration(rand.Intn(6)+3) * time.Second
+					fmt.Printf("⏳ Staggered reconnect: delaying activation for %s by %v (disconnected at: %v)\n",
+						instanceID, activationDelay, disconnectTime.Format("15:04:05"))
+				}
+
+				lastReconnectTime = time.Now()
+				lastReconnectLock.Unlock()
+			}
+
 			sessionsLock.Lock()
 			session, exists := sessions[instanceID]
 			if exists {
@@ -61,16 +93,23 @@ func eventHandler(instanceID string) func(evt interface{}) {
 					session.JID = session.Client.Store.ID.String()
 				}
 
+				fmt.Println("✓ Connected! Instance:", instanceID, "JID:", session.JID)
+			}
+			sessionsLock.Unlock()
+
+			// Tunggu delay sebelum aktivasi (jika ada)
+			if activationDelay > 0 {
+				time.Sleep(activationDelay)
+			}
+
+			if exists {
 				// Kirim presence saat connected, untuk status online di hp
 				if err := session.Client.SendPresence(context.Background(), types.PresenceAvailable); err != nil {
 					fmt.Println("⚠ Failed to send presence for instance:", instanceID, err)
 				} else {
 					fmt.Println("✓ Presence sent (Available) for instance:", instanceID)
 				}
-
-				fmt.Println("✓ Connected! Instance:", instanceID, "JID:", session.JID)
 			}
-			sessionsLock.Unlock()
 
 			if exists && session.Client.Store.ID != nil {
 				// Ambil phoneNumber dari JID (mis. "6285148107612:38@s.whatsapp.net")
@@ -225,6 +264,11 @@ func eventHandler(instanceID string) func(evt interface{}) {
 			if !isLoggingOut {
 				fmt.Println("⚠ Disconnected! Instance:", instanceID)
 
+				// Catat waktu disconnect untuk tracking
+				reconnectTrackerLock.Lock()
+				reconnectTracker[instanceID] = time.Now()
+				reconnectTrackerLock.Unlock()
+
 				sessionsLock.Lock()
 				if session, exists := sessions[instanceID]; exists {
 					session.IsConnected = false
@@ -307,7 +351,7 @@ func LoadAllDevices() error {
 
 	fmt.Printf("Found %d saved devices in database\n", len(devices))
 
-	for _, device := range devices {
+	for i, device := range devices {
 		if device.ID == nil {
 			continue
 		}
@@ -325,6 +369,14 @@ func LoadAllDevices() error {
 		if instanceID == "" {
 			fmt.Printf("Empty instanceID for jid %s, skipping\n", jid)
 			continue
+		}
+
+		// Tambahkan random delay antar reconnect (kecuali device pertama)
+		if i > 0 {
+			// Random delay 3-10 detik untuk menghindari pola bot farm
+			delaySeconds := rand.Intn(8) + 3 // 3-10 detik
+			fmt.Printf("⏳ Waiting %d seconds before reconnecting next device ...\n", delaySeconds)
+			time.Sleep(time.Duration(delaySeconds) * time.Second)
 		}
 
 		// 2) Buat client WhatsMeow dan attach event handler dengan instanceID yang benar
