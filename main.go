@@ -45,13 +45,13 @@ func main() {
 	database.InitAppDB(appDbURL)
 
 	// feature flags (WEBHOOK & WEBSOCKET)
-	wsEnv := strings.ToLower(os.Getenv("SUDEVWA_ENABLE_WEBSOCKET"))
+	wsEnv := strings.ToLower(os.Getenv("SUDEVWA_ENABLE_WEBSOCKET_INCOMING_MSG"))
 	webhookEnv := strings.ToLower(os.Getenv("SUDEVWA_ENABLE_WEBHOOK"))
 
-	config.EnableWebsocket = (wsEnv == "true")
+	config.EnableWebsocketIncomingMessage = (wsEnv == "true")
 	config.EnableWebhook = (webhookEnv == "true")
 
-	log.Printf("feature flags -> websocket: %v, webhook: %v", config.EnableWebsocket, config.EnableWebhook)
+	log.Printf("feature flags -> websocket_incoming_msg: %v, webhook: %v", config.EnableWebsocketIncomingMessage, config.EnableWebhook)
 
 	//jwt
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -242,12 +242,14 @@ func main() {
 	warming.DELETE("/scripts/:id", warmingHandler.DeleteWarmingScript)
 
 	// Script Lines (Dialog/Naskah)
+	// IMPORTANT: Specific routes must come BEFORE parameterized routes to avoid conflicts
+	warming.POST("/scripts/:scriptId/lines/generate", warmingHandler.GenerateWarmingScriptLines)
+	warming.PUT("/scripts/:scriptId/lines/reorder", warmingHandler.ReorderWarmingScriptLines)
 	warming.POST("/scripts/:scriptId/lines", warmingHandler.CreateWarmingScriptLine)
 	warming.GET("/scripts/:scriptId/lines", warmingHandler.GetAllWarmingScriptLines)
 	warming.GET("/scripts/:scriptId/lines/:id", warmingHandler.GetWarmingScriptLineByID)
 	warming.PUT("/scripts/:scriptId/lines/:id", warmingHandler.UpdateWarmingScriptLine)
 	warming.DELETE("/scripts/:scriptId/lines/:id", warmingHandler.DeleteWarmingScriptLine)
-	warming.POST("/scripts/:scriptId/lines/generate", warmingHandler.GenerateWarmingScriptLines)
 
 	// Templates (Manage Conversation Templates)
 	warming.POST("/templates", warmingHandler.CreateWarmingTemplate)
@@ -277,7 +279,7 @@ func main() {
 	// Start warming worker if enabled
 	if os.Getenv("WARMING_WORKER_ENABLED") == "true" {
 		log.Println("🚀 Starting Warming Worker...")
-		go worker.StartWarmingWorker()
+		go worker.StartWarmingWorker(hub)
 	} else {
 		log.Println("⏸️  Warming Worker disabled (set WARMING_WORKER_ENABLED=true to enable)")
 	}

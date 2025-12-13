@@ -20,6 +20,7 @@ type WarmingRoom struct {
 	Status             string // STOPPED, ACTIVE, PAUSED, FINISHED
 	IntervalMinSeconds int
 	IntervalMaxSeconds int
+	SendRealMessage    bool
 	NextRunAt          sql.NullTime
 	LastRunAt          sql.NullTime
 	CreatedAt          time.Time
@@ -37,6 +38,7 @@ type WarmingRoomResponse struct {
 	Status             string     `json:"status"`
 	IntervalMinSeconds int        `json:"intervalMinSeconds"`
 	IntervalMaxSeconds int        `json:"intervalMaxSeconds"`
+	SendRealMessage    bool       `json:"sendRealMessage"`
 	NextRunAt          *time.Time `json:"nextRunAt"`
 	LastRunAt          *time.Time `json:"lastRunAt"`
 	CreatedAt          time.Time  `json:"createdAt"`
@@ -51,13 +53,16 @@ type CreateWarmingRoomRequest struct {
 	ScriptID           int64  `json:"scriptId"`
 	IntervalMinSeconds int    `json:"intervalMinSeconds"`
 	IntervalMaxSeconds int    `json:"intervalMaxSeconds"`
+	SendRealMessage    bool   `json:"sendRealMessage"`
 }
 
 // UpdateWarmingRoomRequest for PUT request
 type UpdateWarmingRoomRequest struct {
 	Name               string `json:"name"`
+	ScriptID           int64  `json:"scriptId"`
 	IntervalMinSeconds int    `json:"intervalMinSeconds"`
 	IntervalMaxSeconds int    `json:"intervalMaxSeconds"`
+	SendRealMessage    bool   `json:"sendRealMessage"`
 }
 
 // CreateWarmingRoom inserts new room
@@ -65,10 +70,10 @@ func CreateWarmingRoom(req *CreateWarmingRoomRequest) (*WarmingRoom, error) {
 	query := `
 		INSERT INTO warming_rooms 
 		(name, sender_instance_id, receiver_instance_id, script_id, 
-		 interval_min_seconds, interval_max_seconds, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+		 interval_min_seconds, interval_max_seconds, send_real_message, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
 		RETURNING id, name, sender_instance_id, receiver_instance_id, script_id, 
-		          current_sequence, status, interval_min_seconds, interval_max_seconds,
+		          current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
 		          next_run_at, last_run_at, created_at, updated_at
 	`
 
@@ -81,6 +86,7 @@ func CreateWarmingRoom(req *CreateWarmingRoomRequest) (*WarmingRoom, error) {
 		req.ScriptID,
 		req.IntervalMinSeconds,
 		req.IntervalMaxSeconds,
+		req.SendRealMessage,
 	).Scan(
 		&room.ID,
 		&room.Name,
@@ -91,6 +97,7 @@ func CreateWarmingRoom(req *CreateWarmingRoomRequest) (*WarmingRoom, error) {
 		&room.Status,
 		&room.IntervalMinSeconds,
 		&room.IntervalMaxSeconds,
+		&room.SendRealMessage,
 		&room.NextRunAt,
 		&room.LastRunAt,
 		&room.CreatedAt,
@@ -112,7 +119,7 @@ func GetAllWarmingRooms(status string) ([]WarmingRoom, error) {
 	if status != "" {
 		query = `
 			SELECT id, name, sender_instance_id, receiver_instance_id, script_id,
-			       current_sequence, status, interval_min_seconds, interval_max_seconds,
+			       current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
 			       next_run_at, last_run_at, created_at, updated_at
 			FROM warming_rooms
 			WHERE status = $1
@@ -122,7 +129,7 @@ func GetAllWarmingRooms(status string) ([]WarmingRoom, error) {
 	} else {
 		query = `
 			SELECT id, name, sender_instance_id, receiver_instance_id, script_id,
-			       current_sequence, status, interval_min_seconds, interval_max_seconds,
+			       current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
 			       next_run_at, last_run_at, created_at, updated_at
 			FROM warming_rooms
 			ORDER BY created_at DESC
@@ -148,6 +155,7 @@ func GetAllWarmingRooms(status string) ([]WarmingRoom, error) {
 			&room.Status,
 			&room.IntervalMinSeconds,
 			&room.IntervalMaxSeconds,
+			&room.SendRealMessage,
 			&room.NextRunAt,
 			&room.LastRunAt,
 			&room.CreatedAt,
@@ -171,7 +179,7 @@ func GetWarmingRoomByID(id string) (*WarmingRoom, error) {
 
 	query := `
 		SELECT id, name, sender_instance_id, receiver_instance_id, script_id,
-		       current_sequence, status, interval_min_seconds, interval_max_seconds,
+		       current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
 		       next_run_at, last_run_at, created_at, updated_at
 		FROM warming_rooms
 		WHERE id = $1
@@ -188,6 +196,7 @@ func GetWarmingRoomByID(id string) (*WarmingRoom, error) {
 		&room.Status,
 		&room.IntervalMinSeconds,
 		&room.IntervalMaxSeconds,
+		&room.SendRealMessage,
 		&room.NextRunAt,
 		&room.LastRunAt,
 		&room.CreatedAt,
@@ -213,15 +222,17 @@ func UpdateWarmingRoom(id string, req *UpdateWarmingRoomRequest) error {
 
 	query := `
 		UPDATE warming_rooms
-		SET name = $1, interval_min_seconds = $2, interval_max_seconds = $3, updated_at = NOW()
-		WHERE id = $4
+		SET name = $1, script_id = $2, interval_min_seconds = $3, interval_max_seconds = $4, send_real_message = $5, updated_at = NOW()
+		WHERE id = $6
 	`
 
 	result, err := database.AppDB.Exec(
 		query,
 		req.Name,
+		req.ScriptID,
 		req.IntervalMinSeconds,
 		req.IntervalMaxSeconds,
+		req.SendRealMessage,
 		roomID,
 	)
 	if err != nil {
@@ -309,9 +320,18 @@ func UpdateRoomStatus(id string, status string, nextRunAt *time.Time) error {
 	return nil
 }
 
-// ToWarmingRoomResponse converts WarmingRoom to response format
 func ToWarmingRoomResponse(room WarmingRoom) WarmingRoomResponse {
-	resp := WarmingRoomResponse{
+	var nextRunAt *time.Time
+	if room.NextRunAt.Valid {
+		nextRunAt = &room.NextRunAt.Time
+	}
+
+	var lastRunAt *time.Time
+	if room.LastRunAt.Valid {
+		lastRunAt = &room.LastRunAt.Time
+	}
+
+	return WarmingRoomResponse{
 		ID:                 room.ID.String(),
 		Name:               room.Name,
 		SenderInstanceID:   room.SenderInstanceID,
@@ -321,26 +341,19 @@ func ToWarmingRoomResponse(room WarmingRoom) WarmingRoomResponse {
 		Status:             room.Status,
 		IntervalMinSeconds: room.IntervalMinSeconds,
 		IntervalMaxSeconds: room.IntervalMaxSeconds,
+		SendRealMessage:    room.SendRealMessage,
+		NextRunAt:          nextRunAt,
+		LastRunAt:          lastRunAt,
 		CreatedAt:          room.CreatedAt,
 		UpdatedAt:          room.UpdatedAt,
 	}
-
-	if room.NextRunAt.Valid {
-		resp.NextRunAt = &room.NextRunAt.Time
-	}
-
-	if room.LastRunAt.Valid {
-		resp.LastRunAt = &room.LastRunAt.Time
-	}
-
-	return resp
 }
 
 // GetActiveRoomsForWorker retrieves rooms ready for execution
 func GetActiveRoomsForWorker(limit int) ([]WarmingRoom, error) {
 	query := `
 		SELECT id, name, sender_instance_id, receiver_instance_id, script_id,
-		       current_sequence, status, interval_min_seconds, interval_max_seconds,
+		       current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
 		       next_run_at, last_run_at, created_at, updated_at
 		FROM warming_rooms
 		WHERE status = 'ACTIVE' AND next_run_at <= NOW()
@@ -368,6 +381,7 @@ func GetActiveRoomsForWorker(limit int) ([]WarmingRoom, error) {
 			&room.Status,
 			&room.IntervalMinSeconds,
 			&room.IntervalMaxSeconds,
+			&room.SendRealMessage,
 			&room.NextRunAt,
 			&room.LastRunAt,
 			&room.CreatedAt,

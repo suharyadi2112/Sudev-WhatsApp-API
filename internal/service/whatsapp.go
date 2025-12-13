@@ -279,7 +279,7 @@ func eventHandler(instanceID string) func(evt interface{}) {
 			}
 
 			// Broadcast ke WebSocket (jika diaktifkan)
-			if config.EnableWebsocket && Realtime != nil {
+			if config.EnableWebsocketIncomingMessage && Realtime != nil {
 				Realtime.BroadcastToInstance(instanceID, map[string]interface{}{
 					"event": "incoming_message",
 					"data":  payload,

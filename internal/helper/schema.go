@@ -209,6 +209,17 @@ func InitCustomSchema() {
 		log.Fatalf("failed to init warming schema: %v", err)
 	}
 
+	// Add send_real_message column if not exists (migration for existing tables)
+	alterWarmingSchema := `
+		ALTER TABLE warming_rooms 
+		ADD COLUMN IF NOT EXISTS send_real_message BOOLEAN NOT NULL DEFAULT false;
+
+		COMMENT ON COLUMN warming_rooms.send_real_message IS 'true = kirim WA asli, false = simulasi saja (dry-run mode)';
+	`
+	if _, err := db.Exec(alterWarmingSchema); err != nil {
+		log.Fatalf("failed to alter warming schema: %v", err)
+	}
+
 	// Warming Templates (Dynamic Templates)
 	templatesSchema := `
 		CREATE TABLE IF NOT EXISTS warming_templates (

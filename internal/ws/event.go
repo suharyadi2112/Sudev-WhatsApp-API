@@ -14,6 +14,8 @@ const (
 	EventQRCancelled = "QR_CANCELLED" // Tambahkan ini
 	// Kalau nanti mau dipakai:
 	// EventQRScanned = "QR_SCANNED"
+
+	EventWarmingMessage = "warming_message" // Warming system message
 )
 
 // WsEvent adalah envelope umum setiap pesan yang dikirim via WebSocket.
@@ -61,4 +63,19 @@ type InstanceErrorData struct {
 	PhoneNumber string `json:"phone_number,omitempty"`
 	Code        string `json:"code"`    // contoh: "LOGIN_FAILED", "UNOFFICIAL_APP", "QR_CHANNEL_FAILED"
 	Message     string `json:"message"` // human readable message
+}
+
+// WarmingMessageData dikirim ketika warming worker mengirim pesan simulasi
+// untuk ditampilkan di live chat frontend.
+type WarmingMessageData struct {
+	RoomID             string    `json:"room_id"`
+	RoomName           string    `json:"room_name"`
+	SenderInstanceID   string    `json:"sender_instance_id"`
+	ReceiverInstanceID string    `json:"receiver_instance_id"`
+	Message            string    `json:"message"`
+	SequenceOrder      int       `json:"sequence_order"`
+	ActorRole          string    `json:"actor_role"` // "ACTOR_A" or "ACTOR_B"
+	Status             string    `json:"status"`     // "SUCCESS" or "FAILED"
+	ErrorMessage       string    `json:"error_message,omitempty"`
+	Timestamp          time.Time `json:"timestamp"`
 }

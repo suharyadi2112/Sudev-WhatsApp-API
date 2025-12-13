@@ -45,6 +45,14 @@ type UpdateWarmingScriptLineRequest struct {
 	TypingDurationSec int    `json:"typingDurationSec"`
 }
 
+// ReorderScriptLinesRequest for POST /scripts/:scriptId/lines/reorder
+type ReorderScriptLinesRequest struct {
+	Lines []struct {
+		ID            int64 `json:"id"`
+		SequenceOrder int   `json:"sequenceOrder"`
+	} `json:"lines"`
+}
+
 // CreateWarmingScriptLine inserts new script line
 func CreateWarmingScriptLine(scriptID int64, req *CreateWarmingScriptLineRequest) (*WarmingScriptLine, error) {
 	query := `
@@ -209,6 +217,77 @@ func ToWarmingScriptLineResponse(line WarmingScriptLine) WarmingScriptLineRespon
 		TypingDurationSec: line.TypingDurationSec,
 		CreatedAt:         line.CreatedAt,
 	}
+}
+
+// ReorderScriptLines updates sequence order for multiple lines in a transaction
+func ReorderScriptLines(scriptID int64, req *ReorderScriptLinesRequest) error {
+	if len(req.Lines) == 0 {
+		return fmt.Errorf("no lines provided for reordering")
+	}
+
+	// Start transaction
+	tx, err := database.AppDB.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// PHASE 1: Set all sequences to temporary negative values to avoid unique constraint conflicts
+	// This prevents conflicts when swapping sequences (e.g., 1→2 and 2→1)
+	tempQuery := `
+		UPDATE warming_script_lines
+		SET sequence_order = $1
+		WHERE id = $2 AND script_id = $3
+	`
+
+	for i, line := range req.Lines {
+		// Use negative index as temporary value (e.g., -1, -2, -3, ...)
+		tempSequence := -(i + 1)
+
+		result, err := tx.Exec(tempQuery, tempSequence, line.ID, scriptID)
+		if err != nil {
+			return fmt.Errorf("failed to set temporary sequence for line %d: %w", line.ID, err)
+		}
+
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to get rows affected for line %d: %w", line.ID, err)
+		}
+
+		if rows == 0 {
+			return fmt.Errorf("line %d not found in script %d", line.ID, scriptID)
+		}
+	}
+
+	// PHASE 2: Update to final sequence orders
+	finalQuery := `
+		UPDATE warming_script_lines
+		SET sequence_order = $1
+		WHERE id = $2 AND script_id = $3
+	`
+
+	for _, line := range req.Lines {
+		result, err := tx.Exec(finalQuery, line.SequenceOrder, line.ID, scriptID)
+		if err != nil {
+			return fmt.Errorf("failed to update line %d to final sequence: %w", line.ID, err)
+		}
+
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to get rows affected for line %d: %w", line.ID, err)
+		}
+
+		if rows == 0 {
+			return fmt.Errorf("line %d not found in script %d", line.ID, scriptID)
+		}
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }
 
 // GetNextAvailableScriptLine retrieves next available script line after current sequence (for worker)

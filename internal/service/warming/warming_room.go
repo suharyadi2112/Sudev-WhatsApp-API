@@ -128,6 +128,20 @@ func UpdateWarmingRoomService(id string, req *warmingModel.UpdateWarmingRoomRequ
 		return ErrRoomNameRequired
 	}
 
+	// Validate script
+	if req.ScriptID <= 0 {
+		return ErrRoomScriptRequired
+	}
+
+	// Check if script exists
+	_, err := warmingModel.GetWarmingScriptByID(int(req.ScriptID))
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return errors.New("script not found")
+		}
+		return fmt.Errorf("failed to verify script: %w", err)
+	}
+
 	// Validate interval
 	if req.IntervalMinSeconds <= 0 {
 		req.IntervalMinSeconds = 5
@@ -140,7 +154,7 @@ func UpdateWarmingRoomService(id string, req *warmingModel.UpdateWarmingRoomRequ
 	}
 
 	// Update in database
-	err := warmingModel.UpdateWarmingRoom(id, req)
+	err = warmingModel.UpdateWarmingRoom(id, req)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return ErrRoomNotFound

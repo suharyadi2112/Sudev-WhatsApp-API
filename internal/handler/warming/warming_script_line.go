@@ -232,3 +232,34 @@ func GenerateWarmingScriptLines(c echo.Context) error {
 		"lines":    responses,
 	})
 }
+
+// ReorderWarmingScriptLines handles POST /warming/scripts/:scriptId/lines/reorder
+func ReorderWarmingScriptLines(c echo.Context) error {
+	scriptIDParam := c.Param("scriptId")
+	scriptID, err := strconv.ParseInt(scriptIDParam, 10, 64)
+	if err != nil {
+		return handler.ErrorResponse(c, http.StatusBadRequest, "Invalid script ID", "INVALID_SCRIPT_ID", err.Error())
+	}
+
+	var req warmingModel.ReorderScriptLinesRequest
+	if err := c.Bind(&req); err != nil {
+		return handler.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", "BAD_REQUEST", err.Error())
+	}
+
+	// Validate request
+	if len(req.Lines) == 0 {
+		return handler.ErrorResponse(c, http.StatusBadRequest, "No lines provided for reordering", "EMPTY_LINES", "")
+	}
+
+	err = warmingModel.ReorderScriptLines(scriptID, &req)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return handler.ErrorResponse(c, http.StatusNotFound, err.Error(), "NOT_FOUND", "")
+		}
+		return handler.ErrorResponse(c, http.StatusInternalServerError, "Failed to reorder script lines", "REORDER_FAILED", err.Error())
+	}
+
+	return handler.SuccessResponse(c, http.StatusOK, "Script lines reordered successfully", map[string]interface{}{
+		"updated": len(req.Lines),
+	})
+}
