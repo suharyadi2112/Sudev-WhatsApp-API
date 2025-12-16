@@ -4,7 +4,7 @@ import (
 	"os"
 )
 
-var EnableWebsocket bool
+var EnableWebsocketIncomingMessage bool
 var EnableWebhook bool
 
 type Config struct {
