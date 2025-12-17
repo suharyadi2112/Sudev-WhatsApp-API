@@ -108,6 +108,26 @@ func executeRoom(room warmingModel.WarmingRoom, hub ws.RealtimePublisher) error 
 		}
 		log.Printf("✅ Room %s: Sent message (sequence %d)", room.Name, line.SequenceOrder)
 	} else {
+		// Check for critical connection errors
+		errMsgLow := strings.ToLower(errMsg)
+		if strings.Contains(errMsgLow, "not connected") ||
+			strings.Contains(errMsgLow, "session not found") ||
+			strings.Contains(errMsgLow, "not logged in") {
+
+			log.Printf("⛔ Room %s PAUSED due to connection error: %s", room.Name, errMsg)
+
+			// Publish failure event with PAUSED status
+			if hub != nil {
+				publishWarmingMessageEvent(hub, room, *line, senderID, receiverID, "Room PAUSED: "+errMsg, "PAUSED", errMsg)
+			}
+
+			// Pause the room
+			if err := warmingModel.UpdateRoomStatus(room.ID.String(), "PAUSED", nil); err != nil {
+				log.Printf("⚠️ Failed to pause room %s: %v", room.Name, err)
+			}
+			return nil
+		}
+
 		if err := warmingModel.UpdateRoomProgress(room.ID, room.CurrentSequence, nextRunAt); err != nil {
 			return fmt.Errorf("failed to update room: %w", err)
 		}
