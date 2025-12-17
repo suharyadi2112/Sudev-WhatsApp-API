@@ -6,6 +6,7 @@ REST API for **WhatsApp Web automation**, **multi-instance management**, and **r
 
 ## 🔍 Keywords
 WhatsApp API, WhatsApp Bot, Multi-instance WhatsApp, WhatsApp Automation, Go WhatsApp, Whatsmeow, WebSocket Real-time, REST API, PostgreSQL, Echo Framework
+
 ## ✨ Key Features
 
 ### 🔐 Authentication & Instance Management
@@ -14,24 +15,41 @@ WhatsApp API, WhatsApp Bot, Multi-instance WhatsApp, WhatsApp Automation, Go Wha
 - Persistent sessions — sessions survive restart, stored in PostgreSQL
 - Auto-reconnect — instances automatically reconnect after server restart
 - **Instance reusability** — logged out instances can scan QR again without creating new instance
+- **Instance availability control** — `used` flag for external app integration, `keterangan` for notes/tracking
 - Graceful logout — complete cleanup (device store + session memory)
+- Circle/group management — organize instances by category
 
 ### 💬 Messaging
 - Send text messages (**by instance ID** or **by phone number**)
 - Send media from URL / file upload
 - Support text, image, video, document
 - Recipient number validation before sending
+- **Human-like typing simulation** — variable typing speed, composing/paused presence, random delays
 - **Real-time incoming message listener** — listen to incoming messages via WebSocket per instance
+
+### 🤖 WhatsApp Warming System
+- **Automated conversation simulation** — warm up WhatsApp accounts with natural dialog
+- **Script-based messaging** — create reusable conversation templates with spintax support
+- **Bidirectional communication** — Actor A ↔ Actor B automatic message exchange
+- **Simulation mode** — test scripts without sending real messages (dry-run)
+- **Real message mode** — send actual WhatsApp messages with typing simulation
+- **Auto-pause on errors** — automatically pause rooms when instances disconnect
+- **Dynamic variables** — `{TIME_GREETING}`, `{DAY_NAME}`, `{DATE}` for contextual messages
+- **Interval control** — randomized delays between messages (min/max seconds)
+- **Real-time monitoring** — WebSocket events for message status and script progress
+- **Drag-and-drop reordering** — easily rearrange script line sequences
 
 ### 🔌 Real-time Features (WebSocket)
 - **Global WebSocket** (`/ws`) — monitor QR events, status changes, system events for all instances
 - **Instance-specific WebSocket** (`/api/listen/:instanceId`) — listen to incoming messages for specific instance
+- **Warming events** — real-time warming message status (SUCCESS/FAILED/FINISHED/PAUSED)
 - **Ping-based keep-alive** — connection stays alive with ping every 5 minutes
 - **Auto-cleanup** — ghost connections automatically removed after 15 minutes timeout
 - Support text messages, extended messages, image/video captions
+- **Configurable incoming broadcast** — control incoming message WebSocket broadcast via env
 
 ### 📲 Device & Presence
-- **Custom device name** — appears as "SUDEVWA Beta" in Linked Devices
+- **Random device identity** — unique OS (Windows/macOS/Linux) + hex ID per instance for privacy
 - **Presence heartbeat** — "Active now" status every 5 minutes
 - Real-time status tracking (`online`, `disconnected`, `logged_out`)
 
@@ -95,8 +113,11 @@ Authorization: Bearer {token}
 
 ### Enable via ENV
 ```
-SUDEVWA_ENABLE_WEBSOCKET=true
-SUDEVWA_ENABLE_WEBHOOK=true
+SUDEVWA_ENABLE_WEBSOCKET_INCOMING_MSG=false //for incoming message only
+SUDEVWA_ENABLE_WEBHOOK=false //for webhook only
+WARMING_WORKER_ENABLED=false //for warming worker (bot)
+SUDEVWA_TYPING_DELAY_MIN=1 //for typing delay min
+SUDEVWA_TYPING_DELAY_MAX=3 //for typing delay max
 ```
 If this variable is not set, or set to anything other than `true`, webhooks will not be sent.
 
