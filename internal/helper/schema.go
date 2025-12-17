@@ -52,7 +52,12 @@ func InitCustomSchema() {
         ADD COLUMN IF NOT EXISTS webhook_url TEXT,
         ADD COLUMN IF NOT EXISTS webhook_secret TEXT;
 
+        ALTER TABLE instances
+        ADD COLUMN IF NOT EXISTS used BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS keterangan TEXT;
+
         CREATE INDEX IF NOT EXISTS idx_instances_circle ON instances(circle);
+        CREATE INDEX IF NOT EXISTS idx_instances_used ON instances(used);
     `
 	if _, err := db.Exec(alterSchema); err != nil {
 		log.Fatalf("failed to alter schema: %v", err)

@@ -195,6 +195,8 @@ func main() {
 
 	// ambil semua instance
 	api.GET("/instances", handler.GetAllInstances)
+	// update instance fields (used, keterangan)
+	api.PATCH("/instances/:instanceId", handler.UpdateInstanceFields)
 
 	// Message routes by instance id
 	api.POST("/send/:instanceId", handler.SendMessage)

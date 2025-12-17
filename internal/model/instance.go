@@ -33,6 +33,8 @@ type Instance struct {
 	Circle          string
 	WebhookURL      sql.NullString
 	WebhookSecret   sql.NullString
+	Used            bool
+	Keterangan      sql.NullString
 }
 
 type InstanceResp struct {
@@ -56,6 +58,8 @@ type InstanceResp struct {
 	LastSeen          time.Time `json:"lastSeen"`
 	ExistsInWhatsmeow bool      `json:"existsInWhatsmeow"`
 	Circle            string    `json:"circle"`
+	Used              bool      `json:"used"`
+	Keterangan        string    `json:"keterangan"`
 }
 
 var ErrNoActiveInstance = errors.New("no active instance for this phone number")
@@ -175,7 +179,9 @@ func GetAllInstances() ([]Instance, error) {
             disconnected_at,
             last_seen,
             session_data,
-			circle
+			circle,
+			used,
+			keterangan
         FROM instances
         ORDER BY created_at DESC
     `
@@ -211,6 +217,8 @@ func GetAllInstances() ([]Instance, error) {
 			&inst.LastSeen,
 			&inst.SessionData,
 			&inst.Circle,
+			&inst.Used,
+			&inst.Keterangan,
 		)
 
 		if err != nil {
@@ -366,7 +374,9 @@ func GetInstanceByInstanceID(instanceID string) (*Instance, error) {
             last_seen,
             session_data,
 			webhook_url,
-			webhook_secret
+			webhook_secret,
+			used,
+			keterangan
         FROM instances
         WHERE instance_id = $1
         LIMIT 1
@@ -410,6 +420,8 @@ func GetInstanceByInstanceID(instanceID string) (*Instance, error) {
 		&inst.SessionData,
 		&inst.WebhookURL,
 		&inst.WebhookSecret,
+		&inst.Used,
+		&inst.Keterangan,
 	)
 	if err != nil {
 		return nil, err
@@ -478,5 +490,65 @@ func ToResponse(inst Instance) InstanceResp {
 		resp.LastSeen = inst.LastSeen.Time
 	}
 
+	resp.Used = inst.Used
+	if inst.Keterangan.Valid {
+		resp.Keterangan = inst.Keterangan.String
+	}
+
 	return resp
+}
+
+// UpdateInstanceFieldsRequest for PATCH /instances/:instanceId
+type UpdateInstanceFieldsRequest struct {
+	Used       *bool   `json:"used"`       // pointer to allow null (optional)
+	Keterangan *string `json:"keterangan"` // pointer to allow null (optional)
+}
+
+// UpdateInstanceFields updates used and keterangan fields
+func UpdateInstanceFields(instanceID string, req *UpdateInstanceFieldsRequest) error {
+	// Build dynamic query based on what fields are provided
+	query := "UPDATE instances SET "
+	args := []interface{}{}
+	argCount := 1
+	updates := []string{}
+
+	if req.Used != nil {
+		updates = append(updates, fmt.Sprintf("used = $%d", argCount))
+		args = append(args, *req.Used)
+		argCount++
+	}
+
+	if req.Keterangan != nil {
+		updates = append(updates, fmt.Sprintf("keterangan = $%d", argCount))
+		args = append(args, *req.Keterangan)
+		argCount++
+	}
+
+	if len(updates) == 0 {
+		return fmt.Errorf("no fields to update")
+	}
+
+	query += updates[0]
+	for i := 1; i < len(updates); i++ {
+		query += ", " + updates[i]
+	}
+
+	query += fmt.Sprintf(" WHERE instance_id = $%d", argCount)
+	args = append(args, instanceID)
+
+	result, err := database.AppDB.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update instance: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
 }
