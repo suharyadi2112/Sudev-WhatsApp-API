@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -550,6 +551,33 @@ func DeleteInstance(c echo.Context) error {
 	}
 
 	return SuccessResponse(c, 200, "Instance deleted successfully", map[string]interface{}{
+		"instanceId": instanceID,
+	})
+}
+
+// PATCH /instances/:instanceId
+func UpdateInstanceFields(c echo.Context) error {
+	instanceID := c.Param("instanceId")
+
+	var req model.UpdateInstanceFieldsRequest
+	if err := c.Bind(&req); err != nil {
+		return ErrorResponse(c, http.StatusBadRequest, "Invalid request body", "BAD_REQUEST", err.Error())
+	}
+
+	// Validate at least one field is provided
+	if req.Used == nil && req.Keterangan == nil {
+		return ErrorResponse(c, http.StatusBadRequest, "At least one field (used or keterangan) must be provided", "NO_FIELDS", "")
+	}
+
+	err := model.UpdateInstanceFields(instanceID, &req)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrorResponse(c, http.StatusNotFound, "Instance not found", "INSTANCE_NOT_FOUND", "")
+		}
+		return ErrorResponse(c, http.StatusInternalServerError, "Failed to update instance", "UPDATE_FAILED", err.Error())
+	}
+
+	return SuccessResponse(c, http.StatusOK, "Instance updated successfully", map[string]interface{}{
 		"instanceId": instanceID,
 	})
 }

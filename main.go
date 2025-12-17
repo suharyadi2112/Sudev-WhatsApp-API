@@ -11,8 +11,10 @@ import (
 	"gowa-yourself/config"
 	"gowa-yourself/database"
 	"gowa-yourself/internal/handler"
+	warmingHandler "gowa-yourself/internal/handler/warming"
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/service"
+	"gowa-yourself/internal/worker"
 
 	"github.com/joho/godotenv"
 	echojwt "github.com/labstack/echo-jwt/v4"
@@ -43,13 +45,13 @@ func main() {
 	database.InitAppDB(appDbURL)
 
 	// feature flags (WEBHOOK & WEBSOCKET)
-	wsEnv := strings.ToLower(os.Getenv("SUDEVWA_ENABLE_WEBSOCKET"))
+	wsEnv := strings.ToLower(os.Getenv("SUDEVWA_ENABLE_WEBSOCKET_INCOMING_MSG"))
 	webhookEnv := strings.ToLower(os.Getenv("SUDEVWA_ENABLE_WEBHOOK"))
 
-	config.EnableWebsocket = (wsEnv == "true")
+	config.EnableWebsocketIncomingMessage = (wsEnv == "true")
 	config.EnableWebhook = (webhookEnv == "true")
 
-	log.Printf("feature flags -> websocket: %v, webhook: %v", config.EnableWebsocket, config.EnableWebhook)
+	log.Printf("feature flags -> websocket_incoming_msg: %v, webhook: %v", config.EnableWebsocketIncomingMessage, config.EnableWebhook)
 
 	//jwt
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -193,6 +195,8 @@ func main() {
 
 	// ambil semua instance
 	api.GET("/instances", handler.GetAllInstances)
+	// update instance fields (used, keterangan)
+	api.PATCH("/instances/:instanceId", handler.UpdateInstanceFields)
 
 	// Message routes by instance id
 	api.POST("/send/:instanceId", handler.SendMessage)
@@ -229,9 +233,57 @@ func main() {
 	//webhook
 	api.POST("/instances/:instanceId/webhook-setconfig", handler.SetWebhookConfig)
 
+	//----------------------------
+	// WARMING SYSTEM
+	//----------------------------
+	warming := api.Group("/warming")
+	warming.POST("/scripts", warmingHandler.CreateWarmingScript)
+	warming.GET("/scripts", warmingHandler.GetAllWarmingScripts)
+	warming.GET("/scripts/:id", warmingHandler.GetWarmingScriptByID)
+	warming.PUT("/scripts/:id", warmingHandler.UpdateWarmingScript)
+	warming.DELETE("/scripts/:id", warmingHandler.DeleteWarmingScript)
+
+	// Script Lines (Dialog/Naskah)
+	// IMPORTANT: Specific routes must come BEFORE parameterized routes to avoid conflicts
+	warming.POST("/scripts/:scriptId/lines/generate", warmingHandler.GenerateWarmingScriptLines)
+	warming.PUT("/scripts/:scriptId/lines/reorder", warmingHandler.ReorderWarmingScriptLines)
+	warming.POST("/scripts/:scriptId/lines", warmingHandler.CreateWarmingScriptLine)
+	warming.GET("/scripts/:scriptId/lines", warmingHandler.GetAllWarmingScriptLines)
+	warming.GET("/scripts/:scriptId/lines/:id", warmingHandler.GetWarmingScriptLineByID)
+	warming.PUT("/scripts/:scriptId/lines/:id", warmingHandler.UpdateWarmingScriptLine)
+	warming.DELETE("/scripts/:scriptId/lines/:id", warmingHandler.DeleteWarmingScriptLine)
+
+	// Templates (Manage Conversation Templates)
+	warming.POST("/templates", warmingHandler.CreateWarmingTemplate)
+	warming.GET("/templates", warmingHandler.GetAllWarmingTemplates)
+	warming.GET("/templates/:id", warmingHandler.GetWarmingTemplateByID)
+	warming.PUT("/templates/:id", warmingHandler.UpdateWarmingTemplate)
+	warming.DELETE("/templates/:id", warmingHandler.DeleteWarmingTemplate)
+
+	// Rooms (Execution Management)
+	warming.POST("/rooms", warmingHandler.CreateWarmingRoom)
+	warming.GET("/rooms", warmingHandler.GetAllWarmingRooms)
+	warming.GET("/rooms/:id", warmingHandler.GetWarmingRoomByID)
+	warming.PUT("/rooms/:id", warmingHandler.UpdateWarmingRoom)
+	warming.DELETE("/rooms/:id", warmingHandler.DeleteWarmingRoom)
+	warming.PATCH("/rooms/:id/status", warmingHandler.UpdateRoomStatus)
+	warming.POST("/rooms/:id/restart", warmingHandler.RestartWarmingRoom)
+
+	// Logs (Execution History - Read Only)
+	warming.GET("/logs", warmingHandler.GetAllWarmingLogs)
+	warming.GET("/logs/:id", warmingHandler.GetWarmingLogByID)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "2121" // default aman
+	}
+
+	// Start warming worker if enabled
+	if os.Getenv("WARMING_WORKER_ENABLED") == "true" {
+		log.Println("🚀 Starting Warming Worker...")
+		go worker.StartWarmingWorker(hub)
+	} else {
+		log.Println("⏸️  Warming Worker disabled (set WARMING_WORKER_ENABLED=true to enable)")
 	}
 
 	baseURL := os.Getenv("BASEURL")
