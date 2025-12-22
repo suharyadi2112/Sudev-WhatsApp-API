@@ -64,7 +64,11 @@ func SendWarmingMessage(senderInstanceID, receiverInstanceID, message string) (b
 	calculatedDelay := baseDelay + int(float64(messageLength)*typingSpeed)
 
 	// Add random variation ±20%
-	variation := rand.Intn(int(float64(calculatedDelay)*0.4)) - int(float64(calculatedDelay)*0.2)
+	variationRange := int(float64(calculatedDelay) * 0.4)
+	if variationRange < 1 {
+		variationRange = 1 // Pastikan minimal 1 untuk menghindari panic
+	}
+	variation := rand.Intn(variationRange) - int(float64(calculatedDelay)*0.2)
 	finalDelay := calculatedDelay + variation
 
 	// Limit delay (min 3 sec, max 30 sec)
@@ -82,7 +86,10 @@ func SendWarmingMessage(senderInstanceID, receiverInstanceID, message string) (b
 		min, _ := strconv.Atoi(minDelayStr)
 		max, _ := strconv.Atoi(maxDelayStr)
 		if max >= min && min > 0 {
-			finalDelay = rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				finalDelay = rand.Intn(rangeVal) + min
+			}
 		}
 	}
 
