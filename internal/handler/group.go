@@ -118,13 +118,16 @@ func SendGroupMessage(c echo.Context) error {
 
 		if max >= min && min > 0 {
 			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				delaySeconds := rand.Intn(rangeVal) + min
 
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				// Kirim status Typing
+				_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+				// Tunggu
+				time.Sleep(time.Duration(delaySeconds) * time.Second)
+			}
 		}
 	}
 
@@ -239,13 +242,16 @@ func SendGroupMedia(c echo.Context) error {
 
 		if max >= min && min > 0 {
 			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				delaySeconds := rand.Intn(rangeVal) + min
 
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				// Kirim status Typing
+				_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+				// Tunggu
+				time.Sleep(time.Duration(delaySeconds) * time.Second)
+			}
 		}
 	}
 
@@ -357,13 +363,16 @@ func SendGroupMediaURL(c echo.Context) error {
 
 		if max >= min && min > 0 {
 			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				delaySeconds := rand.Intn(rangeVal) + min
 
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				// Kirim status Typing
+				_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+				// Tunggu
+				time.Sleep(time.Duration(delaySeconds) * time.Second)
+			}
 		}
 	}
 
@@ -497,13 +506,16 @@ func SendGroupMessageByNumber(c echo.Context) error {
 
 		if max >= min && min > 0 {
 			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				delaySeconds := rand.Intn(rangeVal) + min
 
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				// Kirim status Typing
+				_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+				// Tunggu
+				time.Sleep(time.Duration(delaySeconds) * time.Second)
+			}
 		}
 	}
 
@@ -628,13 +640,16 @@ func SendGroupMediaByNumber(c echo.Context) error {
 
 		if max >= min && min > 0 {
 			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				delaySeconds := rand.Intn(rangeVal) + min
 
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				// Kirim status Typing
+				_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+				// Tunggu
+				time.Sleep(time.Duration(delaySeconds) * time.Second)
+			}
 		}
 	}
 
@@ -756,13 +771,16 @@ func SendGroupMediaURLByNumber(c echo.Context) error {
 
 		if max >= min && min > 0 {
 			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				delaySeconds := rand.Intn(rangeVal) + min
 
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				// Kirim status Typing
+				_ = session.Client.SendChatPresence(context.Background(), groupJID, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+				// Tunggu
+				time.Sleep(time.Duration(delaySeconds) * time.Second)
+			}
 		}
 	}
 

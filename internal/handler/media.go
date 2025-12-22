@@ -134,13 +134,16 @@ func SendMediaFile(c echo.Context) error {
 
 		if max >= min && min > 0 {
 			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				delaySeconds := rand.Intn(rangeVal) + min
 
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				// Kirim status Typing
+				_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+				// Tunggu
+				time.Sleep(time.Duration(delaySeconds) * time.Second)
+			}
 		}
 	}
 
@@ -273,13 +276,16 @@ func SendMediaURL(c echo.Context) error {
 
 		if max >= min && min > 0 {
 			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				delaySeconds := rand.Intn(rangeVal) + min
 
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				// Kirim status Typing
+				_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+				// Tunggu
+				time.Sleep(time.Duration(delaySeconds) * time.Second)
+			}
 		}
 	}
 
@@ -406,13 +412,16 @@ func SendMediaURLByNumber(c echo.Context) error {
 
 		if max >= min && min > 0 {
 			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				delaySeconds := rand.Intn(rangeVal) + min
 
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				// Kirim status Typing
+				_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+				// Tunggu
+				time.Sleep(time.Duration(delaySeconds) * time.Second)
+			}
 		}
 	}
 
@@ -551,13 +560,16 @@ func SendMediaFileByNumber(c echo.Context) error {
 
 		if max >= min && min > 0 {
 			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				delaySeconds := rand.Intn(rangeVal) + min
 
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				// Kirim status Typing
+				_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+				// Tunggu
+				time.Sleep(time.Duration(delaySeconds) * time.Second)
+			}
 		}
 	}
 

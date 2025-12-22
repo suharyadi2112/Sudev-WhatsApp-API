@@ -80,7 +80,11 @@ func SendMessage(c echo.Context) error {
 	calculatedDelay := baseDelay + int(float64(messageLength)*typingSpeed)
 
 	// Tambahkan variasi random ±20%
-	variation := rand.Intn(int(float64(calculatedDelay)*0.4)) - int(float64(calculatedDelay)*0.2)
+	variationRange := int(float64(calculatedDelay) * 0.4)
+	if variationRange < 1 {
+		variationRange = 1 // Pastikan minimal 1 untuk menghindari panic
+	}
+	variation := rand.Intn(variationRange) - int(float64(calculatedDelay)*0.2)
 	finalDelay := calculatedDelay + variation
 
 	// Batasi delay (min 3 detik, max 30 detik)
@@ -98,7 +102,10 @@ func SendMessage(c echo.Context) error {
 		min, _ := strconv.Atoi(minDelayStr)
 		max, _ := strconv.Atoi(maxDelayStr)
 		if max >= min && min > 0 {
-			finalDelay = rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				finalDelay = rand.Intn(rangeVal) + min
+			}
 		}
 	}
 
@@ -198,7 +205,11 @@ func SendMessageByNumber(c echo.Context) error {
 	calculatedDelay := baseDelay + int(float64(messageLength)*typingSpeed)
 
 	// Tambahkan variasi random ±20%
-	variation := rand.Intn(int(float64(calculatedDelay)*0.4)) - int(float64(calculatedDelay)*0.2)
+	variationRange := int(float64(calculatedDelay) * 0.4)
+	if variationRange < 1 {
+		variationRange = 1 // Pastikan minimal 1 untuk menghindari panic
+	}
+	variation := rand.Intn(variationRange) - int(float64(calculatedDelay)*0.2)
 	finalDelay := calculatedDelay + variation
 
 	// Batasi delay (min 3 detik, max 30 detik)
@@ -216,7 +227,10 @@ func SendMessageByNumber(c echo.Context) error {
 		min, _ := strconv.Atoi(minDelayStr)
 		max, _ := strconv.Atoi(maxDelayStr)
 		if max >= min && min > 0 {
-			finalDelay = rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				finalDelay = rand.Intn(rangeVal) + min
+			}
 		}
 	}
 
