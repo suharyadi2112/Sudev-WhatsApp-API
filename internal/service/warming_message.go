@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	"gowa-yourself/internal/helper"
+
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 )
@@ -47,14 +49,15 @@ func SendWarmingMessage(senderInstanceID, receiverInstanceID, message string) (b
 
 	ctx := context.Background()
 
-	// Check if receiver is registered on WhatsApp (same as handler.SendMessage)
-	isRegistered, err := senderSession.Client.IsOnWhatsApp(ctx, []string{recipientJID.User})
-	if err != nil {
-		return false, fmt.Sprintf("failed to verify receiver number: %v", err)
-	}
+	if !helper.ShouldSkipValidation(recipientJID.User) {
+		isRegistered, err := senderSession.Client.IsOnWhatsApp(ctx, []string{recipientJID.User})
+		if err != nil {
+			return false, fmt.Sprintf("failed to verify receiver number: %v", err)
+		}
 
-	if len(isRegistered) == 0 || !isRegistered[0].IsIn {
-		return false, "receiver phone number is not registered on WhatsApp"
+		if len(isRegistered) == 0 || !isRegistered[0].IsIn {
+			return false, "receiver phone number is not registered on WhatsApp"
+		}
 	}
 
 	// Typing simulation (same as SendMessage handler)

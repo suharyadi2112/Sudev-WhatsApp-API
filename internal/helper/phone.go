@@ -2,6 +2,7 @@ package helper
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 
@@ -57,6 +58,33 @@ func FormatPhoneNumber(phone string) (types.JID, error) {
 		User:   cleaned,
 		Server: types.DefaultUserServer,
 	}, nil
+}
+
+// ShouldSkipValidation checks if the phone number should skip IsOnWhatsApp validation
+func ShouldSkipValidation(phone string) bool {
+	allow9Digit := os.Getenv("ALLOW_9_DIGIT_PHONE_NUMBER") == "true"
+	if !allow9Digit {
+		return false
+	}
+
+	cleaned := regexp.MustCompile(`[^\d]`).ReplaceAllString(phone, "")
+
+	// 9 digits: 818280277
+	if len(cleaned) == 9 {
+		return true
+	}
+
+	// 10 digits with 0: 0818280277
+	if len(cleaned) == 10 && strings.HasPrefix(cleaned, "0") {
+		return true
+	}
+
+	// 11 digits with 62: 62818280277
+	if len(cleaned) == 11 && strings.HasPrefix(cleaned, "62") {
+		return true
+	}
+
+	return false
 }
 
 func ExtractPhoneFromJID(jid string) string {
