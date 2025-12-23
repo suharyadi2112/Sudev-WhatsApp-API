@@ -219,7 +219,10 @@ func sendWhatsAppMessage(senderID, receiverID, message string, sendReal bool) (b
 func calculateNextRun(minSec, maxSec int) time.Time {
 	interval := minSec
 	if maxSec > minSec {
-		interval = minSec + rand.Intn(maxSec-minSec+1)
+		rangeVal := maxSec - minSec + 1
+		if rangeVal > 0 {
+			interval = minSec + rand.Intn(rangeVal)
+		}
 	}
 	return time.Now().Add(time.Duration(interval) * time.Second)
 }

@@ -63,14 +63,16 @@ func SendMessage(c echo.Context) error {
 		return ErrorResponse(c, 400, "Invalid phone number", "INVALID_PHONE", err.Error())
 	}
 
-	isRegistered, err := session.Client.IsOnWhatsApp(context.Background(), []string{recipient.User})
-	if err != nil {
-		return ErrorResponse(c, 500, "Failed to verify phone number", "VERIFICATION_FAILED", err.Error())
-	}
+	if !helper.ShouldSkipValidation(req.To) {
+		isRegistered, err := session.Client.IsOnWhatsApp(context.Background(), []string{recipient.User})
+		if err != nil {
+			return ErrorResponse(c, 500, "Failed to verify phone number", "VERIFICATION_FAILED", err.Error())
+		}
 
-	if len(isRegistered) == 0 || !isRegistered[0].IsIn {
-		return ErrorResponse(c, 400, "Phone number is not registered on WhatsApp", "PHONE_NOT_REGISTERED",
-			"Please check the number or ask recipient to install WhatsApp")
+		if len(isRegistered) == 0 || !isRegistered[0].IsIn {
+			return ErrorResponse(c, 400, "Phone number is not registered on WhatsApp", "PHONE_NOT_REGISTERED",
+				"Please check the number or ask recipient to install WhatsApp")
+		}
 	}
 
 	// Simulasi typing yang lebih natural
@@ -80,7 +82,11 @@ func SendMessage(c echo.Context) error {
 	calculatedDelay := baseDelay + int(float64(messageLength)*typingSpeed)
 
 	// Tambahkan variasi random ±20%
-	variation := rand.Intn(int(float64(calculatedDelay)*0.4)) - int(float64(calculatedDelay)*0.2)
+	variationRange := int(float64(calculatedDelay) * 0.4)
+	if variationRange < 1 {
+		variationRange = 1 // Pastikan minimal 1 untuk menghindari panic
+	}
+	variation := rand.Intn(variationRange) - int(float64(calculatedDelay)*0.2)
 	finalDelay := calculatedDelay + variation
 
 	// Batasi delay (min 3 detik, max 30 detik)
@@ -98,7 +104,10 @@ func SendMessage(c echo.Context) error {
 		min, _ := strconv.Atoi(minDelayStr)
 		max, _ := strconv.Atoi(maxDelayStr)
 		if max >= min && min > 0 {
-			finalDelay = rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				finalDelay = rand.Intn(rangeVal) + min
+			}
 		}
 	}
 
@@ -182,13 +191,15 @@ func SendMessageByNumber(c echo.Context) error {
 		return ErrorResponse(c, 400, "Invalid phone number", "INVALID_PHONE", err.Error())
 	}
 
-	isRegistered, err := session.Client.IsOnWhatsApp(context.Background(), []string{recipient.User})
-	if err != nil {
-		return ErrorResponse(c, 500, "Failed to verify phone number", "VERIFICATION_FAILED", err.Error())
-	}
-	if len(isRegistered) == 0 || !isRegistered[0].IsIn {
-		return ErrorResponse(c, 400, "Phone number is not registered on WhatsApp", "PHONE_NOT_REGISTERED",
-			"Please check the number or ask recipient to install WhatsApp")
+	if !helper.ShouldSkipValidation(req.To) {
+		isRegistered, err := session.Client.IsOnWhatsApp(context.Background(), []string{recipient.User})
+		if err != nil {
+			return ErrorResponse(c, 500, "Failed to verify phone number", "VERIFICATION_FAILED", err.Error())
+		}
+		if len(isRegistered) == 0 || !isRegistered[0].IsIn {
+			return ErrorResponse(c, 400, "Phone number is not registered on WhatsApp", "PHONE_NOT_REGISTERED",
+				"Please check the number or ask recipient to install WhatsApp")
+		}
 	}
 
 	// Simulasi typing yang lebih natural
@@ -198,7 +209,11 @@ func SendMessageByNumber(c echo.Context) error {
 	calculatedDelay := baseDelay + int(float64(messageLength)*typingSpeed)
 
 	// Tambahkan variasi random ±20%
-	variation := rand.Intn(int(float64(calculatedDelay)*0.4)) - int(float64(calculatedDelay)*0.2)
+	variationRange := int(float64(calculatedDelay) * 0.4)
+	if variationRange < 1 {
+		variationRange = 1 // Pastikan minimal 1 untuk menghindari panic
+	}
+	variation := rand.Intn(variationRange) - int(float64(calculatedDelay)*0.2)
 	finalDelay := calculatedDelay + variation
 
 	// Batasi delay (min 3 detik, max 30 detik)
@@ -216,7 +231,10 @@ func SendMessageByNumber(c echo.Context) error {
 		min, _ := strconv.Atoi(minDelayStr)
 		max, _ := strconv.Atoi(maxDelayStr)
 		if max >= min && min > 0 {
-			finalDelay = rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				finalDelay = rand.Intn(rangeVal) + min
+			}
 		}
 	}
 
@@ -277,6 +295,8 @@ func CheckNumber(c echo.Context) error {
 		return ErrorResponse(c, 400, "Invalid phone number", "INVALID_PHONE", err.Error())
 	}
 
+	willSkipValidation := helper.ShouldSkipValidation(req.Phone)
+
 	isRegistered, err := session.Client.IsOnWhatsApp(context.Background(), []string{recipient.User})
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to check phone number", "CHECK_FAILED", err.Error())
@@ -287,8 +307,24 @@ func CheckNumber(c echo.Context) error {
 	}
 
 	return SuccessResponse(c, 200, "Phone number checked", map[string]interface{}{
-		"phone":        req.Phone,
-		"isRegistered": isRegistered[0].IsIn,
-		"jid":          isRegistered[0].JID.String(),
+		"phone":              req.Phone,
+		"isRegistered":       isRegistered[0].IsIn,
+		"jid":                isRegistered[0].JID.String(),
+		"willSkipValidation": willSkipValidation,
+		"note":               getValidationNote(isRegistered[0].IsIn, willSkipValidation),
 	})
+}
+
+// Helper function to provide user-friendly note about validation behavior
+func getValidationNote(isRegistered, willSkip bool) string {
+	if willSkip {
+		if isRegistered {
+			return "Number is registered. Validation will be skipped when sending (ALLOW_9_DIGIT_PHONE_NUMBER=true)"
+		}
+		return "Number appears unregistered, but validation will be skipped when sending (ALLOW_9_DIGIT_PHONE_NUMBER=true). Message will be attempted anyway."
+	}
+	if isRegistered {
+		return "Number is registered and will pass validation when sending"
+	}
+	return "Number is not registered. Message sending will be blocked unless ALLOW_9_DIGIT_PHONE_NUMBER=true is set"
 }

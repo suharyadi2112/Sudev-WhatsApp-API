@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	"gowa-yourself/internal/helper"
+
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 )
@@ -47,14 +49,15 @@ func SendWarmingMessage(senderInstanceID, receiverInstanceID, message string) (b
 
 	ctx := context.Background()
 
-	// Check if receiver is registered on WhatsApp (same as handler.SendMessage)
-	isRegistered, err := senderSession.Client.IsOnWhatsApp(ctx, []string{recipientJID.User})
-	if err != nil {
-		return false, fmt.Sprintf("failed to verify receiver number: %v", err)
-	}
+	if !helper.ShouldSkipValidation(recipientJID.User) {
+		isRegistered, err := senderSession.Client.IsOnWhatsApp(ctx, []string{recipientJID.User})
+		if err != nil {
+			return false, fmt.Sprintf("failed to verify receiver number: %v", err)
+		}
 
-	if len(isRegistered) == 0 || !isRegistered[0].IsIn {
-		return false, "receiver phone number is not registered on WhatsApp"
+		if len(isRegistered) == 0 || !isRegistered[0].IsIn {
+			return false, "receiver phone number is not registered on WhatsApp"
+		}
 	}
 
 	// Typing simulation (same as SendMessage handler)
@@ -64,7 +67,11 @@ func SendWarmingMessage(senderInstanceID, receiverInstanceID, message string) (b
 	calculatedDelay := baseDelay + int(float64(messageLength)*typingSpeed)
 
 	// Add random variation ±20%
-	variation := rand.Intn(int(float64(calculatedDelay)*0.4)) - int(float64(calculatedDelay)*0.2)
+	variationRange := int(float64(calculatedDelay) * 0.4)
+	if variationRange < 1 {
+		variationRange = 1 // Pastikan minimal 1 untuk menghindari panic
+	}
+	variation := rand.Intn(variationRange) - int(float64(calculatedDelay)*0.2)
 	finalDelay := calculatedDelay + variation
 
 	// Limit delay (min 3 sec, max 30 sec)
@@ -82,7 +89,10 @@ func SendWarmingMessage(senderInstanceID, receiverInstanceID, message string) (b
 		min, _ := strconv.Atoi(minDelayStr)
 		max, _ := strconv.Atoi(maxDelayStr)
 		if max >= min && min > 0 {
-			finalDelay = rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				finalDelay = rand.Intn(rangeVal) + min
+			}
 		}
 	}
 

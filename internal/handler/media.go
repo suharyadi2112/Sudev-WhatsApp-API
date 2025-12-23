@@ -66,15 +66,16 @@ func SendMediaFile(c echo.Context) error {
 		return ErrorResponse(c, 400, "Invalid phone number", "INVALID_PHONE", err.Error())
 	}
 
-	// 6. CEK NOMOR TERDAFTAR DI WHATSAPP
-	isRegistered, err := session.Client.IsOnWhatsApp(context.Background(), []string{recipient.User})
-	if err != nil {
-		return ErrorResponse(c, 500, "Failed to verify phone number", "VERIFICATION_FAILED", err.Error())
-	}
+	if !helper.ShouldSkipValidation(to) {
+		isRegistered, err := session.Client.IsOnWhatsApp(context.Background(), []string{recipient.User})
+		if err != nil {
+			return ErrorResponse(c, 500, "Failed to verify phone number", "VERIFICATION_FAILED", err.Error())
+		}
 
-	if len(isRegistered) == 0 || !isRegistered[0].IsIn {
-		return ErrorResponse(c, 400, "Phone number is not registered on WhatsApp", "PHONE_NOT_REGISTERED",
-			"Please check the number or ask recipient to install WhatsApp")
+		if len(isRegistered) == 0 || !isRegistered[0].IsIn {
+			return ErrorResponse(c, 400, "Phone number is not registered on WhatsApp", "PHONE_NOT_REGISTERED",
+				"Please check the number or ask recipient to install WhatsApp")
+		}
 	}
 
 	// 7. GET & VALIDATE FILE
@@ -134,13 +135,16 @@ func SendMediaFile(c echo.Context) error {
 
 		if max >= min && min > 0 {
 			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				delaySeconds := rand.Intn(rangeVal) + min
 
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				// Kirim status Typing
+				_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+				// Tunggu
+				time.Sleep(time.Duration(delaySeconds) * time.Second)
+			}
 		}
 	}
 
@@ -209,15 +213,16 @@ func SendMediaURL(c echo.Context) error {
 		return ErrorResponse(c, 400, "Invalid phone number", "INVALID_PHONE", err.Error())
 	}
 
-	// 6. CEK NOMOR TERDAFTAR DI WHATSAPP
-	isRegistered, err := session.Client.IsOnWhatsApp(context.Background(), []string{recipient.User})
-	if err != nil {
-		return ErrorResponse(c, 500, "Failed to verify phone number", "VERIFICATION_FAILED", err.Error())
-	}
+	if !helper.ShouldSkipValidation(req.To) {
+		isRegistered, err := session.Client.IsOnWhatsApp(context.Background(), []string{recipient.User})
+		if err != nil {
+			return ErrorResponse(c, 500, "Failed to verify phone number", "VERIFICATION_FAILED", err.Error())
+		}
 
-	if len(isRegistered) == 0 || !isRegistered[0].IsIn {
-		return ErrorResponse(c, 400, "Phone number is not registered on WhatsApp", "PHONE_NOT_REGISTERED",
-			"Please check the number or ask recipient to install WhatsApp")
+		if len(isRegistered) == 0 || !isRegistered[0].IsIn {
+			return ErrorResponse(c, 400, "Phone number is not registered on WhatsApp", "PHONE_NOT_REGISTERED",
+				"Please check the number or ask recipient to install WhatsApp")
+		}
 	}
 
 	// 7. DOWNLOAD FILE FROM URL
@@ -273,13 +278,16 @@ func SendMediaURL(c echo.Context) error {
 
 		if max >= min && min > 0 {
 			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				delaySeconds := rand.Intn(rangeVal) + min
 
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				// Kirim status Typing
+				_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+				// Tunggu
+				time.Sleep(time.Duration(delaySeconds) * time.Second)
+			}
 		}
 	}
 
@@ -351,13 +359,15 @@ func SendMediaURLByNumber(c echo.Context) error {
 		return ErrorResponse(c, 400, "Invalid phone number", "INVALID_PHONE", err.Error())
 	}
 
-	isRegistered, err := session.Client.IsOnWhatsApp(context.Background(), []string{recipient.User})
-	if err != nil {
-		return ErrorResponse(c, 500, "Failed to verify phone number", "VERIFICATION_FAILED", err.Error())
-	}
+	if !helper.ShouldSkipValidation(req.To) {
+		isRegistered, err := session.Client.IsOnWhatsApp(context.Background(), []string{recipient.User})
+		if err != nil {
+			return ErrorResponse(c, 500, "Failed to verify phone number", "VERIFICATION_FAILED", err.Error())
+		}
 
-	if len(isRegistered) == 0 || !isRegistered[0].IsIn {
-		return ErrorResponse(c, 400, "Phone number is not registered on WhatsApp", "PHONE_NOT_REGISTERED", "Please check the number or ask recipient to install WhatsApp")
+		if len(isRegistered) == 0 || !isRegistered[0].IsIn {
+			return ErrorResponse(c, 400, "Phone number is not registered on WhatsApp", "PHONE_NOT_REGISTERED", "Please check the number or ask recipient to install WhatsApp")
+		}
 	}
 
 	fmt.Printf("Downloading from: %s\n", req.MediaURL)
@@ -406,13 +416,16 @@ func SendMediaURLByNumber(c echo.Context) error {
 
 		if max >= min && min > 0 {
 			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				delaySeconds := rand.Intn(rangeVal) + min
 
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				// Kirim status Typing
+				_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+				// Tunggu
+				time.Sleep(time.Duration(delaySeconds) * time.Second)
+			}
 		}
 	}
 
@@ -486,14 +499,15 @@ func SendMediaFileByNumber(c echo.Context) error {
 		return ErrorResponse(c, 400, "Invalid phone number", "INVALID_PHONE", err.Error())
 	}
 
-	// 7. CEK NOMOR TUJUAN TERDAFTAR DI WHATSAPP
-	isRegistered, err := session.Client.IsOnWhatsApp(context.Background(), []string{recipient.User})
-	if err != nil {
-		return ErrorResponse(c, 500, "Failed to verify phone number", "VERIFICATION_FAILED", err.Error())
-	}
+	if !helper.ShouldSkipValidation(to) {
+		isRegistered, err := session.Client.IsOnWhatsApp(context.Background(), []string{recipient.User})
+		if err != nil {
+			return ErrorResponse(c, 500, "Failed to verify phone number", "VERIFICATION_FAILED", err.Error())
+		}
 
-	if len(isRegistered) == 0 || !isRegistered[0].IsIn {
-		return ErrorResponse(c, 400, "Phone number is not registered on WhatsApp", "PHONE_NOT_REGISTERED", "Please check the number or ask recipient to install WhatsApp")
+		if len(isRegistered) == 0 || !isRegistered[0].IsIn {
+			return ErrorResponse(c, 400, "Phone number is not registered on WhatsApp", "PHONE_NOT_REGISTERED", "Please check the number or ask recipient to install WhatsApp")
+		}
 	}
 
 	// 8. GET & VALIDATE FILE
@@ -551,13 +565,16 @@ func SendMediaFileByNumber(c echo.Context) error {
 
 		if max >= min && min > 0 {
 			// Generate random delay
-			delaySeconds := rand.Intn(max-min+1) + min
+			rangeVal := max - min + 1
+			if rangeVal > 0 {
+				delaySeconds := rand.Intn(rangeVal) + min
 
-			// Kirim status Typing
-			_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				// Kirim status Typing
+				_ = session.Client.SendChatPresence(context.Background(), recipient, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 
-			// Tunggu
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+				// Tunggu
+				time.Sleep(time.Duration(delaySeconds) * time.Second)
+			}
 		}
 	}
 
