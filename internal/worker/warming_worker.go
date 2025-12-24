@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"gowa-yourself/internal/helper"
 	warmingModel "gowa-yourself/internal/model/warming"
 	"gowa-yourself/internal/service"
 	"gowa-yourself/internal/ws"
@@ -17,7 +18,8 @@ import (
 func StartWarmingWorker(hub ws.RealtimePublisher) {
 	log.Println("🤖 Warming Worker started")
 
-	ticker := time.NewTicker(5 * time.Second)
+	interval := helper.GetEnvAsInt("WARMING_WORKER_INTERVAL_SECONDS", 5)
+	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	defer ticker.Stop()
 
 	for range ticker.C {
