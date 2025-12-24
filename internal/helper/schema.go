@@ -53,7 +53,7 @@ func InitCustomSchema() {
         ADD COLUMN IF NOT EXISTS webhook_secret TEXT;
 
         ALTER TABLE instances
-        ADD COLUMN IF NOT EXISTS used BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS used BOOLEAN NOT NULL DEFAULT true,
         ADD COLUMN IF NOT EXISTS keterangan TEXT;
 
         CREATE INDEX IF NOT EXISTS idx_instances_circle ON instances(circle);
