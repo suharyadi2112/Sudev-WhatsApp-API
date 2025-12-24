@@ -131,16 +131,17 @@ func GetActiveInstanceByPhoneNumber(phoneNumber string) (*Instance, error) {
 func InsertInstance(in *Instance) error {
 	query := `
     INSERT INTO instances (
-        instance_id, status, is_connected, created_at, session_data, circle
-    ) VALUES ($1, $2, $3, $4, $5, $6)`
+        instance_id, status, is_connected, created_at, session_data, circle, used
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7)`
 	_, err := database.AppDB.Exec(
 		query,
 		in.InstanceID,
 		in.Status,
 		in.IsConnected,
 		in.CreatedAt,
-		in.SessionData, // <- pastikan mengisi ini (bisa nil untuk awal)
+		in.SessionData,
 		in.Circle,
+		true, // Default used = true
 	)
 	return err
 }
@@ -548,6 +549,29 @@ func UpdateInstanceFields(instanceID string, req *UpdateInstanceFieldsRequest) e
 
 	if rows == 0 {
 		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+// ErrInstanceNotAvailable returned when instance is blocked (used = false)
+var ErrInstanceNotAvailable = errors.New("instance not available for sending messages")
+
+// ValidateInstanceUsed checks if instance is allowed to send messages (returns error if used = false)
+func ValidateInstanceUsed(instanceID string) error {
+	query := `SELECT used FROM instances WHERE instance_id = $1`
+
+	var used bool
+	err := database.AppDB.QueryRow(query, instanceID).Scan(&used)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("instance not found: %s", instanceID)
+		}
+		return fmt.Errorf("failed to check instance availability: %w", err)
+	}
+
+	if !used {
+		return ErrInstanceNotAvailable
 	}
 
 	return nil
