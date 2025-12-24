@@ -220,6 +220,27 @@ func InitCustomSchema() {
 		ADD COLUMN IF NOT EXISTS send_real_message BOOLEAN NOT NULL DEFAULT false;
 
 		COMMENT ON COLUMN warming_rooms.send_real_message IS 'true = kirim WA asli, false = simulasi saja (dry-run mode)';
+		
+		-- HUMAN_VS_BOT feature columns
+		ALTER TABLE warming_rooms
+		ADD COLUMN IF NOT EXISTS room_type VARCHAR(20) NOT NULL DEFAULT 'BOT_VS_BOT'
+			CHECK (room_type IN ('BOT_VS_BOT', 'HUMAN_VS_BOT')),
+		ADD COLUMN IF NOT EXISTS whitelisted_number VARCHAR(50),
+		ADD COLUMN IF NOT EXISTS reply_delay_min INT NOT NULL DEFAULT 10,
+		ADD COLUMN IF NOT EXISTS reply_delay_max INT NOT NULL DEFAULT 60,
+		ADD COLUMN IF NOT EXISTS use_ai BOOLEAN NOT NULL DEFAULT false,
+		ADD COLUMN IF NOT EXISTS ai_context TEXT;
+		
+		COMMENT ON COLUMN warming_rooms.room_type IS 'BOT_VS_BOT: automated script exchange, HUMAN_VS_BOT: auto-reply to human';
+		COMMENT ON COLUMN warming_rooms.whitelisted_number IS 'Phone number allowed to trigger auto-reply (format: 6281234567890)';
+		COMMENT ON COLUMN warming_rooms.reply_delay_min IS 'Minimum delay in seconds before replying (HUMAN_VS_BOT mode)';
+		COMMENT ON COLUMN warming_rooms.reply_delay_max IS 'Maximum delay in seconds before replying (HUMAN_VS_BOT mode)';
+		COMMENT ON COLUMN warming_rooms.use_ai IS 'Use AI (OpenAI/Gemini) for generating replies instead of script';
+		COMMENT ON COLUMN warming_rooms.ai_context IS 'Context/personality for AI replies (e.g., "casual friend", "professional colleague")';
+		
+		-- Indexes for HUMAN_VS_BOT queries
+		CREATE INDEX IF NOT EXISTS idx_rooms_type ON warming_rooms(room_type);
+		CREATE INDEX IF NOT EXISTS idx_rooms_whitelist ON warming_rooms(whitelisted_number);
 	`
 	if _, err := db.Exec(alterWarmingSchema); err != nil {
 		log.Fatalf("failed to alter warming schema: %v", err)

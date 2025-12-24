@@ -15,12 +15,18 @@ type WarmingRoom struct {
 	Name               string
 	SenderInstanceID   string
 	ReceiverInstanceID string
-	ScriptID           int64
+	ScriptID           int64 // Mandatory: required for all room types
 	CurrentSequence    int
 	Status             string // STOPPED, ACTIVE, PAUSED, FINISHED
 	IntervalMinSeconds int
 	IntervalMaxSeconds int
 	SendRealMessage    bool
+	RoomType           string
+	WhitelistedNumber  sql.NullString
+	ReplyDelayMin      int
+	ReplyDelayMax      int
+	UseAI              bool
+	AIContext          sql.NullString
 	NextRunAt          sql.NullTime
 	LastRunAt          sql.NullTime
 	CreatedAt          time.Time
@@ -39,6 +45,12 @@ type WarmingRoomResponse struct {
 	IntervalMinSeconds int        `json:"intervalMinSeconds"`
 	IntervalMaxSeconds int        `json:"intervalMaxSeconds"`
 	SendRealMessage    bool       `json:"sendRealMessage"`
+	RoomType           string     `json:"roomType"`
+	WhitelistedNumber  string     `json:"whitelistedNumber,omitempty"`
+	ReplyDelayMin      int        `json:"replyDelayMin"`
+	ReplyDelayMax      int        `json:"replyDelayMax"`
+	UseAI              bool       `json:"useAi"`
+	AIContext          string     `json:"aiContext,omitempty"`
 	NextRunAt          *time.Time `json:"nextRunAt"`
 	LastRunAt          *time.Time `json:"lastRunAt"`
 	CreatedAt          time.Time  `json:"createdAt"`
@@ -54,6 +66,12 @@ type CreateWarmingRoomRequest struct {
 	IntervalMinSeconds int    `json:"intervalMinSeconds"`
 	IntervalMaxSeconds int    `json:"intervalMaxSeconds"`
 	SendRealMessage    bool   `json:"sendRealMessage"`
+	RoomType           string `json:"roomType,omitempty"`
+	WhitelistedNumber  string `json:"whitelistedNumber,omitempty"`
+	ReplyDelayMin      int    `json:"replyDelayMin,omitempty"`
+	ReplyDelayMax      int    `json:"replyDelayMax,omitempty"`
+	UseAI              bool   `json:"useAi,omitempty"`
+	AIContext          string `json:"aiContext,omitempty"`
 }
 
 // UpdateWarmingRoomRequest for PUT request
@@ -63,6 +81,12 @@ type UpdateWarmingRoomRequest struct {
 	IntervalMinSeconds int    `json:"intervalMinSeconds"`
 	IntervalMaxSeconds int    `json:"intervalMaxSeconds"`
 	SendRealMessage    bool   `json:"sendRealMessage"`
+	RoomType           string `json:"roomType,omitempty"`
+	WhitelistedNumber  string `json:"whitelistedNumber,omitempty"`
+	ReplyDelayMin      int    `json:"replyDelayMin,omitempty"`
+	ReplyDelayMax      int    `json:"replyDelayMax,omitempty"`
+	UseAI              bool   `json:"useAi,omitempty"`
+	AIContext          string `json:"aiContext,omitempty"`
 }
 
 // CreateWarmingRoom inserts new room
@@ -70,10 +94,13 @@ func CreateWarmingRoom(req *CreateWarmingRoomRequest) (*WarmingRoom, error) {
 	query := `
 		INSERT INTO warming_rooms 
 		(name, sender_instance_id, receiver_instance_id, script_id, 
-		 interval_min_seconds, interval_max_seconds, send_real_message, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+		 interval_min_seconds, interval_max_seconds, send_real_message,
+		 room_type, whitelisted_number, reply_delay_min, reply_delay_max, use_ai, ai_context,
+		 created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
 		RETURNING id, name, sender_instance_id, receiver_instance_id, script_id, 
 		          current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
+		          room_type, whitelisted_number, reply_delay_min, reply_delay_max, use_ai, ai_context,
 		          next_run_at, last_run_at, created_at, updated_at
 	`
 
@@ -87,6 +114,12 @@ func CreateWarmingRoom(req *CreateWarmingRoomRequest) (*WarmingRoom, error) {
 		req.IntervalMinSeconds,
 		req.IntervalMaxSeconds,
 		req.SendRealMessage,
+		req.RoomType,
+		sql.NullString{String: req.WhitelistedNumber, Valid: req.WhitelistedNumber != ""},
+		req.ReplyDelayMin,
+		req.ReplyDelayMax,
+		req.UseAI,
+		sql.NullString{String: req.AIContext, Valid: req.AIContext != ""},
 	).Scan(
 		&room.ID,
 		&room.Name,
@@ -98,6 +131,12 @@ func CreateWarmingRoom(req *CreateWarmingRoomRequest) (*WarmingRoom, error) {
 		&room.IntervalMinSeconds,
 		&room.IntervalMaxSeconds,
 		&room.SendRealMessage,
+		&room.RoomType,
+		&room.WhitelistedNumber,
+		&room.ReplyDelayMin,
+		&room.ReplyDelayMax,
+		&room.UseAI,
+		&room.AIContext,
 		&room.NextRunAt,
 		&room.LastRunAt,
 		&room.CreatedAt,
@@ -120,6 +159,7 @@ func GetAllWarmingRooms(status string) ([]WarmingRoom, error) {
 		query = `
 			SELECT id, name, sender_instance_id, receiver_instance_id, script_id,
 			       current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
+			       room_type, whitelisted_number, reply_delay_min, reply_delay_max, use_ai, ai_context,
 			       next_run_at, last_run_at, created_at, updated_at
 			FROM warming_rooms
 			WHERE status = $1
@@ -130,6 +170,7 @@ func GetAllWarmingRooms(status string) ([]WarmingRoom, error) {
 		query = `
 			SELECT id, name, sender_instance_id, receiver_instance_id, script_id,
 			       current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
+			       room_type, whitelisted_number, reply_delay_min, reply_delay_max, use_ai, ai_context,
 			       next_run_at, last_run_at, created_at, updated_at
 			FROM warming_rooms
 			ORDER BY created_at DESC
@@ -156,6 +197,12 @@ func GetAllWarmingRooms(status string) ([]WarmingRoom, error) {
 			&room.IntervalMinSeconds,
 			&room.IntervalMaxSeconds,
 			&room.SendRealMessage,
+			&room.RoomType,
+			&room.WhitelistedNumber,
+			&room.ReplyDelayMin,
+			&room.ReplyDelayMax,
+			&room.UseAI,
+			&room.AIContext,
 			&room.NextRunAt,
 			&room.LastRunAt,
 			&room.CreatedAt,
@@ -180,6 +227,7 @@ func GetWarmingRoomByID(id string) (*WarmingRoom, error) {
 	query := `
 		SELECT id, name, sender_instance_id, receiver_instance_id, script_id,
 		       current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
+		       room_type, whitelisted_number, reply_delay_min, reply_delay_max, use_ai, ai_context,
 		       next_run_at, last_run_at, created_at, updated_at
 		FROM warming_rooms
 		WHERE id = $1
@@ -197,6 +245,12 @@ func GetWarmingRoomByID(id string) (*WarmingRoom, error) {
 		&room.IntervalMinSeconds,
 		&room.IntervalMaxSeconds,
 		&room.SendRealMessage,
+		&room.RoomType,
+		&room.WhitelistedNumber,
+		&room.ReplyDelayMin,
+		&room.ReplyDelayMax,
+		&room.UseAI,
+		&room.AIContext,
 		&room.NextRunAt,
 		&room.LastRunAt,
 		&room.CreatedAt,
@@ -222,8 +276,10 @@ func UpdateWarmingRoom(id string, req *UpdateWarmingRoomRequest) error {
 
 	query := `
 		UPDATE warming_rooms
-		SET name = $1, script_id = $2, interval_min_seconds = $3, interval_max_seconds = $4, send_real_message = $5, updated_at = NOW()
-		WHERE id = $6
+		SET name = $1, script_id = $2, interval_min_seconds = $3, interval_max_seconds = $4, send_real_message = $5,
+		    room_type = $6, whitelisted_number = $7, reply_delay_min = $8, reply_delay_max = $9, use_ai = $10, ai_context = $11,
+		    updated_at = NOW()
+		WHERE id = $12
 	`
 
 	result, err := database.AppDB.Exec(
@@ -233,6 +289,12 @@ func UpdateWarmingRoom(id string, req *UpdateWarmingRoomRequest) error {
 		req.IntervalMinSeconds,
 		req.IntervalMaxSeconds,
 		req.SendRealMessage,
+		req.RoomType,
+		sql.NullString{String: req.WhitelistedNumber, Valid: req.WhitelistedNumber != ""},
+		req.ReplyDelayMin,
+		req.ReplyDelayMax,
+		req.UseAI,
+		sql.NullString{String: req.AIContext, Valid: req.AIContext != ""},
 		roomID,
 	)
 	if err != nil {
@@ -331,6 +393,16 @@ func ToWarmingRoomResponse(room WarmingRoom) WarmingRoomResponse {
 		lastRunAt = &room.LastRunAt.Time
 	}
 
+	var whitelistedNumber string
+	if room.WhitelistedNumber.Valid {
+		whitelistedNumber = room.WhitelistedNumber.String
+	}
+
+	var aiContext string
+	if room.AIContext.Valid {
+		aiContext = room.AIContext.String
+	}
+
 	return WarmingRoomResponse{
 		ID:                 room.ID.String(),
 		Name:               room.Name,
@@ -342,6 +414,12 @@ func ToWarmingRoomResponse(room WarmingRoom) WarmingRoomResponse {
 		IntervalMinSeconds: room.IntervalMinSeconds,
 		IntervalMaxSeconds: room.IntervalMaxSeconds,
 		SendRealMessage:    room.SendRealMessage,
+		RoomType:           room.RoomType,
+		WhitelistedNumber:  whitelistedNumber,
+		ReplyDelayMin:      room.ReplyDelayMin,
+		ReplyDelayMax:      room.ReplyDelayMax,
+		UseAI:              room.UseAI,
+		AIContext:          aiContext,
 		NextRunAt:          nextRunAt,
 		LastRunAt:          lastRunAt,
 		CreatedAt:          room.CreatedAt,
@@ -354,6 +432,7 @@ func GetActiveRoomsForWorker(limit int) ([]WarmingRoom, error) {
 	query := `
 		SELECT id, name, sender_instance_id, receiver_instance_id, script_id,
 		       current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
+		       room_type, whitelisted_number, reply_delay_min, reply_delay_max, use_ai, ai_context,
 		       next_run_at, last_run_at, created_at, updated_at
 		FROM warming_rooms
 		WHERE status = 'ACTIVE' AND next_run_at <= NOW()
@@ -382,6 +461,12 @@ func GetActiveRoomsForWorker(limit int) ([]WarmingRoom, error) {
 			&room.IntervalMinSeconds,
 			&room.IntervalMaxSeconds,
 			&room.SendRealMessage,
+			&room.RoomType,
+			&room.WhitelistedNumber,
+			&room.ReplyDelayMin,
+			&room.ReplyDelayMax,
+			&room.UseAI,
+			&room.AIContext,
 			&room.NextRunAt,
 			&room.LastRunAt,
 			&room.CreatedAt,
