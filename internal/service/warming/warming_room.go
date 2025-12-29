@@ -202,13 +202,56 @@ func UpdateWarmingRoomService(id string, req *warmingModel.UpdateWarmingRoomRequ
 		return ErrRoomNameRequired
 	}
 
+	// Get existing room to check room_type
+	existingRoom, err := warmingModel.GetWarmingRoomByID(id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return ErrRoomNotFound
+		}
+		return fmt.Errorf("failed to get existing room: %w", err)
+	}
+
+	// Prevent room_type changes (immutable after creation)
+	if req.RoomType != "" && req.RoomType != existingRoom.RoomType {
+		return errors.New("room_type cannot be changed after creation. Please create a new room instead")
+	}
+
+	// Use existing room_type if not provided in request
+	if req.RoomType == "" {
+		req.RoomType = existingRoom.RoomType
+	}
+
+	// Validate room_type
+	if req.RoomType != "BOT_VS_BOT" && req.RoomType != "HUMAN_VS_BOT" {
+		return errors.New("invalid room_type: must be 'BOT_VS_BOT' or 'HUMAN_VS_BOT'")
+	}
+
+	// HUMAN_VS_BOT specific validation
+	if req.RoomType == "HUMAN_VS_BOT" {
+		// Validate whitelisted number
+		if strings.TrimSpace(req.WhitelistedNumber) == "" {
+			return errors.New("whitelisted_number is required for HUMAN_VS_BOT")
+		}
+
+		// Validate reply delays
+		if req.ReplyDelayMin <= 0 {
+			req.ReplyDelayMin = 10
+		}
+		if req.ReplyDelayMax <= 0 {
+			req.ReplyDelayMax = 60
+		}
+		if req.ReplyDelayMax < req.ReplyDelayMin {
+			return errors.New("reply_delay_max must be >= reply_delay_min")
+		}
+	}
+
 	// Validate script
 	if req.ScriptID <= 0 {
 		return ErrRoomScriptRequired
 	}
 
 	// Check if script exists
-	_, err := warmingModel.GetWarmingScriptByID(int(req.ScriptID))
+	_, err = warmingModel.GetWarmingScriptByID(int(req.ScriptID))
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return errors.New("script not found")
