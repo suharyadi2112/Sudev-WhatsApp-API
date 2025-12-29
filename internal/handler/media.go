@@ -45,6 +45,15 @@ func SendMediaFile(c echo.Context) error {
 		return ErrorResponse(c, 404, "Session not found", "SESSION_NOT_FOUND", "Please login first")
 	}
 
+	// Validate instance used flag
+	if err := model.ValidateInstanceUsed(instanceID); err != nil {
+		if errors.Is(err, model.ErrInstanceNotAvailable) {
+			return ErrorResponse(c, 403, "Instance is blocked from sending messages. Please check the used flag", "INSTANCE_NOT_AVAILABLE",
+				"This instance is currently blocked. Please activate the instance first by setting 'used' flag to true via PATCH /api/instances/:instanceId")
+		}
+		return ErrorResponse(c, 500, "Failed to validate instance", "VALIDATION_ERROR", err.Error())
+	}
+
 	// 2. CEK CONNECTION FLAG (dari memory/database)
 	if !session.IsConnected {
 		return ErrorResponse(c, 400, "Session is not connected", "NOT_CONNECTED", "Please check /status endpoint")
@@ -190,6 +199,15 @@ func SendMediaURL(c echo.Context) error {
 	session, err := service.GetSession(instanceID)
 	if err != nil {
 		return ErrorResponse(c, 404, "Session not found", "SESSION_NOT_FOUND", "Please login first")
+	}
+
+	// Validate instance used flag
+	if err := model.ValidateInstanceUsed(instanceID); err != nil {
+		if errors.Is(err, model.ErrInstanceNotAvailable) {
+			return ErrorResponse(c, 403, "Instance is blocked from sending messages. Please check the used flag", "INSTANCE_NOT_AVAILABLE",
+				"This instance is currently blocked. Please activate the instance first by setting 'used' flag to true via PATCH /api/instances/:instanceId")
+		}
+		return ErrorResponse(c, 500, "Failed to validate instance", "VALIDATION_ERROR", err.Error())
 	}
 
 	// 2. CEK CONNECTION FLAG (dari memory/database)
@@ -342,6 +360,15 @@ func SendMediaURLByNumber(c echo.Context) error {
 		return ErrorResponse(c, 404, "Session not found", "SESSION_NOT_FOUND", "Please login / reconnect first")
 	}
 
+	// Validate instance used flag
+	if err := model.ValidateInstanceUsed(inst.InstanceID); err != nil {
+		if errors.Is(err, model.ErrInstanceNotAvailable) {
+			return ErrorResponse(c, 403, "Instance is blocked from sending messages. Please check the used flag", "INSTANCE_NOT_AVAILABLE",
+				"This instance is currently blocked. Please activate the instance first by setting 'used' flag to true via PATCH /api/instances/:instanceId")
+		}
+		return ErrorResponse(c, 500, "Failed to validate instance", "VALIDATION_ERROR", err.Error())
+	}
+
 	if !session.IsConnected {
 		return ErrorResponse(c, 400, "Session is not connected", "NOT_CONNECTED", "Please check /status endpoint")
 	}
@@ -478,6 +505,15 @@ func SendMediaFileByNumber(c echo.Context) error {
 		return ErrorResponse(c, 404, "Session not found", "SESSION_NOT_FOUND", "Please login / reconnect first")
 	}
 
+	// Validate instance used flag
+	if err := model.ValidateInstanceUsed(inst.InstanceID); err != nil {
+		if errors.Is(err, model.ErrInstanceNotAvailable) {
+			return ErrorResponse(c, 403, "Instance is blocked from sending messages. Please check the used flag", "INSTANCE_NOT_AVAILABLE",
+				"This instance is currently blocked. Please activate the instance first by setting 'used' flag to true via PATCH /api/instances/:instanceId")
+		}
+		return ErrorResponse(c, 500, "Failed to validate instance", "VALIDATION_ERROR", err.Error())
+	}
+
 	// 3. CEK CONNECTION FLAG (dari memory/database)
 	if !session.IsConnected {
 		return ErrorResponse(c, 400, "Session is not connected", "NOT_CONNECTED", "Please check /status endpoint")
@@ -607,12 +643,12 @@ func SendMediaFileByNumber(c echo.Context) error {
 func getMaxFileSize(mediaType string) int {
 	switch mediaType {
 	case "image":
-		return 5 * 1024 * 1024 // 5MB for images
+		return helper.GetEnvAsInt("MAX_FILE_SIZE_IMAGE_MB", 5) * 1024 * 1024
 	case "video":
-		return 16 * 1024 * 1024 // 16MB for videos
+		return helper.GetEnvAsInt("MAX_FILE_SIZE_VIDEO_MB", 16) * 1024 * 1024
 	case "audio":
-		return 16 * 1024 * 1024 // 16MB for audio
+		return helper.GetEnvAsInt("MAX_FILE_SIZE_AUDIO_MB", 16) * 1024 * 1024
 	default: // document
-		return 100 * 1024 * 1024 // 100MB for documents
+		return helper.GetEnvAsInt("MAX_FILE_SIZE_DOCUMENT_MB", 100) * 1024 * 1024
 	}
 }

@@ -85,6 +85,15 @@ func SendGroupMessage(c echo.Context) error {
 		return ErrorResponse(c, 404, "Session not found", "SESSION_NOT_FOUND", "")
 	}
 
+	// Validate instance used flag
+	if err := model.ValidateInstanceUsed(instanceID); err != nil {
+		if errors.Is(err, model.ErrInstanceNotAvailable) {
+			return ErrorResponse(c, 403, "Instance is blocked from sending messages. Please check the used flag", "INSTANCE_NOT_AVAILABLE",
+				"This instance is currently blocked. Please activate the instance first by setting 'used' flag to true via PATCH /api/instances/:instanceId")
+		}
+		return ErrorResponse(c, 500, "Failed to validate instance", "VALIDATION_ERROR", err.Error())
+	}
+
 	if !session.IsConnected {
 		return ErrorResponse(c, 400, "Session is not connected", "NOT_CONNECTED", "")
 	}
@@ -166,6 +175,15 @@ func SendGroupMedia(c echo.Context) error {
 	session, err := service.GetSession(instanceID)
 	if err != nil {
 		return ErrorResponse(c, 404, "Session not found", "SESSION_NOT_FOUND", "")
+	}
+
+	// Validate instance used flag
+	if err := model.ValidateInstanceUsed(instanceID); err != nil {
+		if errors.Is(err, model.ErrInstanceNotAvailable) {
+			return ErrorResponse(c, 403, "Instance is blocked from sending messages. Please check the used flag", "INSTANCE_NOT_AVAILABLE",
+				"This instance is currently blocked. Please activate the instance first by setting 'used' flag to true via PATCH /api/instances/:instanceId")
+		}
+		return ErrorResponse(c, 500, "Failed to validate instance", "VALIDATION_ERROR", err.Error())
 	}
 
 	if !session.IsConnected {
@@ -297,6 +315,15 @@ func SendGroupMediaURL(c echo.Context) error {
 	session, err := service.GetSession(instanceID)
 	if err != nil {
 		return ErrorResponse(c, 404, "Session not found", "SESSION_NOT_FOUND", "")
+	}
+
+	// Validate instance used flag
+	if err := model.ValidateInstanceUsed(instanceID); err != nil {
+		if errors.Is(err, model.ErrInstanceNotAvailable) {
+			return ErrorResponse(c, 403, "Instance is blocked from sending messages. Please check the used flag", "INSTANCE_NOT_AVAILABLE",
+				"This instance is currently blocked. Please activate the instance first by setting 'used' flag to true via PATCH /api/instances/:instanceId")
+		}
+		return ErrorResponse(c, 500, "Failed to validate instance", "VALIDATION_ERROR", err.Error())
 	}
 
 	if !session.IsConnected {
@@ -473,6 +500,15 @@ func SendGroupMessageByNumber(c echo.Context) error {
 		return ErrorResponse(c, 404, "Session not found", "SESSION_NOT_FOUND", "")
 	}
 
+	// Validate instance used flag
+	if err := model.ValidateInstanceUsed(inst.InstanceID); err != nil {
+		if errors.Is(err, model.ErrInstanceNotAvailable) {
+			return ErrorResponse(c, 403, "Instance is blocked from sending messages. Please check the used flag", "INSTANCE_NOT_AVAILABLE",
+				"This instance is currently blocked. Please activate the instance first by setting 'used' flag to true via PATCH /api/instances/:instanceId")
+		}
+		return ErrorResponse(c, 500, "Failed to validate instance", "VALIDATION_ERROR", err.Error())
+	}
+
 	if !session.IsConnected {
 		return ErrorResponse(c, 400, "Session is not connected", "NOT_CONNECTED", "")
 	}
@@ -565,6 +601,15 @@ func SendGroupMediaByNumber(c echo.Context) error {
 	session, err := service.GetSession(inst.InstanceID)
 	if err != nil {
 		return ErrorResponse(c, 404, "Session not found", "SESSION_NOT_FOUND", "")
+	}
+
+	// Validate instance used flag
+	if err := model.ValidateInstanceUsed(inst.InstanceID); err != nil {
+		if errors.Is(err, model.ErrInstanceNotAvailable) {
+			return ErrorResponse(c, 403, "Instance is blocked from sending messages. Please check the used flag", "INSTANCE_NOT_AVAILABLE",
+				"This instance is currently blocked. Please activate the instance first by setting 'used' flag to true via PATCH /api/instances/:instanceId")
+		}
+		return ErrorResponse(c, 500, "Failed to validate instance", "VALIDATION_ERROR", err.Error())
 	}
 
 	if !session.IsConnected {
@@ -706,6 +751,15 @@ func SendGroupMediaURLByNumber(c echo.Context) error {
 	session, err := service.GetSession(inst.InstanceID)
 	if err != nil {
 		return ErrorResponse(c, 404, "Session not found", "SESSION_NOT_FOUND", "")
+	}
+
+	// Validate instance used flag
+	if err := model.ValidateInstanceUsed(inst.InstanceID); err != nil {
+		if errors.Is(err, model.ErrInstanceNotAvailable) {
+			return ErrorResponse(c, 403, "Instance is blocked from sending messages. Please check the used flag", "INSTANCE_NOT_AVAILABLE",
+				"This instance is currently blocked. Please activate the instance first by setting 'used' flag to true via PATCH /api/instances/:instanceId")
+		}
+		return ErrorResponse(c, 500, "Failed to validate instance", "VALIDATION_ERROR", err.Error())
 	}
 
 	if !session.IsConnected {

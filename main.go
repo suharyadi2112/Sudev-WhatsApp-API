@@ -125,13 +125,17 @@ func main() {
 		return c.NoContent(http.StatusOK)
 	})
 
-	// Rate limiter: 10 request per detik per IP
+	// Rate limiter configuration from env
+	rateLimit := helper.GetEnvAsInt("RATE_LIMIT_PER_SECOND", 10)
+	rateBurst := helper.GetEnvAsInt("RATE_LIMIT_BURST", 10)
+	rateWindow := helper.GetEnvAsInt("RATE_LIMIT_WINDOW_MINUTES", 3)
+
 	e.Use(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
 		Store: middleware.NewRateLimiterMemoryStoreWithConfig(
 			middleware.RateLimiterMemoryStoreConfig{
-				Rate:      rate.Limit(10),  // 10 req / detik
-				Burst:     10,              // boleh burst sampai 10
-				ExpiresIn: 3 * time.Minute, // window penyimpanan per IP
+				Rate:      rate.Limit(rateLimit),
+				Burst:     rateBurst,
+				ExpiresIn: time.Duration(rateWindow) * time.Minute,
 			},
 		),
 	}))

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"gowa-yourself/internal/helper"
+	"gowa-yourself/internal/model"
 
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
@@ -21,6 +23,14 @@ func SendWarmingMessage(senderInstanceID, receiverInstanceID, message string) (b
 	senderSession, err := GetSession(senderInstanceID)
 	if err != nil {
 		return false, fmt.Sprintf("sender session not found: %v", err)
+	}
+
+	// Validate sender instance used flag
+	if err := model.ValidateInstanceUsed(senderInstanceID); err != nil {
+		if errors.Is(err, model.ErrInstanceNotAvailable) {
+			return false, fmt.Sprintf("sender instance is blocked (used=false): %s", senderInstanceID)
+		}
+		return false, fmt.Sprintf("failed to validate sender instance: %v", err)
 	}
 
 	if !senderSession.IsConnected || !senderSession.Client.IsConnected() {
