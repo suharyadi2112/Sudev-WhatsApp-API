@@ -6,6 +6,9 @@ import (
 
 var EnableWebsocketIncomingMessage bool
 var EnableWebhook bool
+var WarmingWorkerEnabled bool
+var WarmingAutoReplyEnabled bool
+var WarmingAutoReplyCooldown int // seconds
 
 type Config struct {
 	Port               string

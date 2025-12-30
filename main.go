@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,7 +52,22 @@ func main() {
 	config.EnableWebsocketIncomingMessage = (wsEnv == "true")
 	config.EnableWebhook = (webhookEnv == "true")
 
-	log.Printf("feature flags -> websocket_incoming_msg: %v, webhook: %v", config.EnableWebsocketIncomingMessage, config.EnableWebhook)
+	autoReplyEnv := os.Getenv("WARMING_AUTO_REPLY_ENABLED")
+	config.WarmingAutoReplyEnabled = (autoReplyEnv == "true")
+
+	cooldownStr := os.Getenv("WARMING_AUTO_REPLY_COOLDOWN")
+	if cooldownStr != "" {
+		if cooldown, err := strconv.Atoi(cooldownStr); err == nil && cooldown > 0 {
+			config.WarmingAutoReplyCooldown = cooldown
+		} else {
+			config.WarmingAutoReplyCooldown = 60 // default 60 seconds
+		}
+	} else {
+		config.WarmingAutoReplyCooldown = 60 // default 60 seconds
+	}
+
+	log.Printf("feature flags -> websocket_incoming_msg: %v, webhook: %v, warming_auto_reply: %v",
+		config.EnableWebsocketIncomingMessage, config.EnableWebhook, config.WarmingAutoReplyEnabled)
 
 	//jwt
 	jwtSecret := os.Getenv("JWT_SECRET")

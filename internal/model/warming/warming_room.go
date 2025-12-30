@@ -532,3 +532,50 @@ func RestartRoom(id string) error {
 
 	return nil
 }
+
+func GetActiveHumanRoomBySender(senderNumber string) (*WarmingRoom, error) {
+	query := `
+		SELECT id, name, sender_instance_id, receiver_instance_id, script_id,
+		       current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
+		       room_type, whitelisted_number, reply_delay_min, reply_delay_max, use_ai, ai_context,
+		       next_run_at, last_run_at, created_at, updated_at
+		FROM warming_rooms
+		WHERE room_type = 'HUMAN_VS_BOT' 
+		  AND status = 'ACTIVE' 
+		  AND whitelisted_number = $1
+		LIMIT 1
+	`
+
+	room := &WarmingRoom{}
+	err := database.AppDB.QueryRow(query, senderNumber).Scan(
+		&room.ID,
+		&room.Name,
+		&room.SenderInstanceID,
+		&room.ReceiverInstanceID,
+		&room.ScriptID,
+		&room.CurrentSequence,
+		&room.Status,
+		&room.IntervalMinSeconds,
+		&room.IntervalMaxSeconds,
+		&room.SendRealMessage,
+		&room.RoomType,
+		&room.WhitelistedNumber,
+		&room.ReplyDelayMin,
+		&room.ReplyDelayMax,
+		&room.UseAI,
+		&room.AIContext,
+		&room.NextRunAt,
+		&room.LastRunAt,
+		&room.CreatedAt,
+		&room.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get human room by sender: %w", err)
+	}
+
+	return room, nil
+}
