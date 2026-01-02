@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -13,7 +14,6 @@ import (
 	"gowa-yourself/database"
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/model"
-
 	"gowa-yourself/internal/ws"
 
 	"go.mau.fi/whatsmeow/store"
@@ -309,6 +309,39 @@ func eventHandler(instanceID string) func(evt interface{}) {
 			}
 
 			fmt.Printf("📨 Received message from %s: %s\n", v.Info.Sender, messageText)
+
+			// Debug logging for sender investigation
+			fmt.Printf("🔍 DEBUG - Full sender: %s\n", v.Info.Sender.String())
+			fmt.Printf("🔍 DEBUG - User: %s, Server: %s\n", v.Info.Sender.User, v.Info.Sender.Server)
+			fmt.Printf("🔍 DEBUG - IsGroup: %v, IsFromMe: %v\n", v.Info.IsGroup, v.Info.IsFromMe)
+
+			senderNumber := v.Info.Sender.User
+
+			// If message from linked device (@lid), resolve to real phone number
+			if v.Info.Sender.Server == "lid" {
+				session, err := GetSession(instanceID)
+				if err == nil && session.Client != nil {
+					ctx := context.Background()
+
+					// Convert LID to Phone Number using whatsmeow's LID store
+					phoneJID, err := session.Client.Store.LIDs.GetPNForLID(ctx, v.Info.Sender)
+					if err == nil && phoneJID.User != "" {
+						senderNumber = phoneJID.User
+						log.Printf("✅ Resolved LID %s to phone number: %s", v.Info.Sender.User, senderNumber)
+					} else {
+						log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+						log.Printf("⚠️ HUMAN_VS_BOT: Could not resolve LID to phone number")
+						log.Printf("👤 Contact Name: %s", v.Info.PushName)
+						log.Printf("🔑 LID (Use this for whitelisting): %s", v.Info.Sender.User)
+						log.Printf("💡 To enable auto-reply, set whitelisted_number = '%s'", v.Info.Sender.User)
+						log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+					}
+				}
+			}
+
+			if err := HandleIncomingMessage(instanceID, senderNumber, messageText); err != nil {
+				log.Printf("[HUMAN_VS_BOT] Error handling incoming message: %v", err)
+			}
 
 			// Siapkan Payload (dipakai WS & Webhook)
 			payload := map[string]interface{}{

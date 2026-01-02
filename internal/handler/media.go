@@ -643,12 +643,12 @@ func SendMediaFileByNumber(c echo.Context) error {
 func getMaxFileSize(mediaType string) int {
 	switch mediaType {
 	case "image":
-		return 5 * 1024 * 1024 // 5MB for images
+		return helper.GetEnvAsInt("MAX_FILE_SIZE_IMAGE_MB", 5) * 1024 * 1024
 	case "video":
-		return 16 * 1024 * 1024 // 16MB for videos
+		return helper.GetEnvAsInt("MAX_FILE_SIZE_VIDEO_MB", 16) * 1024 * 1024
 	case "audio":
-		return 16 * 1024 * 1024 // 16MB for audio
+		return helper.GetEnvAsInt("MAX_FILE_SIZE_AUDIO_MB", 16) * 1024 * 1024
 	default: // document
-		return 100 * 1024 * 1024 // 100MB for documents
+		return helper.GetEnvAsInt("MAX_FILE_SIZE_DOCUMENT_MB", 100) * 1024 * 1024
 	}
 }

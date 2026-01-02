@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"gowa-yourself/internal/model"
 	warmingModel "gowa-yourself/internal/model/warming"
 )
 
@@ -28,19 +29,95 @@ func CreateWarmingRoomService(req *warmingModel.CreateWarmingRoomRequest) (*warm
 		return nil, ErrRoomNameRequired
 	}
 
-	// Validate sender
-	if strings.TrimSpace(req.SenderInstanceID) == "" {
-		return nil, ErrRoomSenderRequired
+	// Set default room_type if not provided
+	if req.RoomType == "" {
+		req.RoomType = "BOT_VS_BOT"
 	}
 
-	// Validate receiver
-	if strings.TrimSpace(req.ReceiverInstanceID) == "" {
-		return nil, ErrRoomReceiverRequired
+	// Validate room_type
+	if req.RoomType != "BOT_VS_BOT" && req.RoomType != "HUMAN_VS_BOT" {
+		return nil, errors.New("invalid room_type: must be 'BOT_VS_BOT' or 'HUMAN_VS_BOT'")
 	}
 
-	// Validate not same instance
-	if req.SenderInstanceID == req.ReceiverInstanceID {
-		return nil, ErrRoomSameInstance
+	// BOT_VS_BOT specific validation
+	if req.RoomType == "BOT_VS_BOT" {
+		// Validate sender
+		if strings.TrimSpace(req.SenderInstanceID) == "" {
+			return nil, ErrRoomSenderRequired
+		}
+
+		// Validate receiver
+		if strings.TrimSpace(req.ReceiverInstanceID) == "" {
+			return nil, ErrRoomReceiverRequired
+		}
+
+		// Validate not same instance
+		if req.SenderInstanceID == req.ReceiverInstanceID {
+			return nil, ErrRoomSameInstance
+		}
+
+		// Validate sender instance exists, online, and available
+		senderInstance, err := model.GetInstanceByInstanceID(req.SenderInstanceID)
+		if err != nil {
+			return nil, fmt.Errorf("sender instance not found: %s", req.SenderInstanceID)
+		}
+		if senderInstance.Status != "online" {
+			return nil, fmt.Errorf("sender instance '%s' is not online (status: %s)", req.SenderInstanceID, senderInstance.Status)
+		}
+		if !senderInstance.Used {
+			return nil, fmt.Errorf("sender instance '%s' is not available (used=false)", req.SenderInstanceID)
+		}
+
+		// Validate receiver instance exists, online, and available
+		receiverInstance, err := model.GetInstanceByInstanceID(req.ReceiverInstanceID)
+		if err != nil {
+			return nil, fmt.Errorf("receiver instance not found: %s", req.ReceiverInstanceID)
+		}
+		if receiverInstance.Status != "online" {
+			return nil, fmt.Errorf("receiver instance '%s' is not online (status: %s)", req.ReceiverInstanceID, receiverInstance.Status)
+		}
+		if !receiverInstance.Used {
+			return nil, fmt.Errorf("receiver instance '%s' is not available (used=false)", req.ReceiverInstanceID)
+		}
+	}
+
+	// HUMAN_VS_BOT specific validation
+	if req.RoomType == "HUMAN_VS_BOT" {
+		// Validate sender (the bot that will auto-reply)
+		if strings.TrimSpace(req.SenderInstanceID) == "" {
+			return nil, ErrRoomSenderRequired
+		}
+
+		// Validate whitelisted number
+		if strings.TrimSpace(req.WhitelistedNumber) == "" {
+			return nil, errors.New("whitelisted_number is required for HUMAN_VS_BOT")
+		}
+
+		// Validate sender instance exists, online, and available
+		senderInstance, err := model.GetInstanceByInstanceID(req.SenderInstanceID)
+		if err != nil {
+			return nil, fmt.Errorf("sender instance not found: %s", req.SenderInstanceID)
+		}
+		if senderInstance.Status != "online" {
+			return nil, fmt.Errorf("sender instance '%s' is not online (status: %s)", req.SenderInstanceID, senderInstance.Status)
+		}
+		if !senderInstance.Used {
+			return nil, fmt.Errorf("sender instance '%s' is not available (used=false)", req.SenderInstanceID)
+		}
+
+		// Set default reply delays if not provided
+		if req.ReplyDelayMin <= 0 {
+			req.ReplyDelayMin = 10
+		}
+		if req.ReplyDelayMax <= 0 {
+			req.ReplyDelayMax = 60
+		}
+		if req.ReplyDelayMax < req.ReplyDelayMin {
+			return nil, errors.New("reply_delay_max must be >= reply_delay_min")
+		}
+
+		// Receiver not needed for HUMAN_VS_BOT (human is the receiver)
+		req.ReceiverInstanceID = ""
 	}
 
 	// Validate script
@@ -128,13 +205,56 @@ func UpdateWarmingRoomService(id string, req *warmingModel.UpdateWarmingRoomRequ
 		return ErrRoomNameRequired
 	}
 
+	// Get existing room to check room_type
+	existingRoom, err := warmingModel.GetWarmingRoomByID(id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return ErrRoomNotFound
+		}
+		return fmt.Errorf("failed to get existing room: %w", err)
+	}
+
+	// Prevent room_type changes (immutable after creation)
+	if req.RoomType != "" && req.RoomType != existingRoom.RoomType {
+		return errors.New("room_type cannot be changed after creation. Please create a new room instead")
+	}
+
+	// Use existing room_type if not provided in request
+	if req.RoomType == "" {
+		req.RoomType = existingRoom.RoomType
+	}
+
+	// Validate room_type
+	if req.RoomType != "BOT_VS_BOT" && req.RoomType != "HUMAN_VS_BOT" {
+		return errors.New("invalid room_type: must be 'BOT_VS_BOT' or 'HUMAN_VS_BOT'")
+	}
+
+	// HUMAN_VS_BOT specific validation
+	if req.RoomType == "HUMAN_VS_BOT" {
+		// Validate whitelisted number
+		if strings.TrimSpace(req.WhitelistedNumber) == "" {
+			return errors.New("whitelisted_number is required for HUMAN_VS_BOT")
+		}
+
+		// Validate reply delays
+		if req.ReplyDelayMin <= 0 {
+			req.ReplyDelayMin = 10
+		}
+		if req.ReplyDelayMax <= 0 {
+			req.ReplyDelayMax = 60
+		}
+		if req.ReplyDelayMax < req.ReplyDelayMin {
+			return errors.New("reply_delay_max must be >= reply_delay_min")
+		}
+	}
+
 	// Validate script
 	if req.ScriptID <= 0 {
 		return ErrRoomScriptRequired
 	}
 
 	// Check if script exists
-	_, err := warmingModel.GetWarmingScriptByID(int(req.ScriptID))
+	_, err = warmingModel.GetWarmingScriptByID(int(req.ScriptID))
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return errors.New("script not found")
