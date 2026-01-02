@@ -83,9 +83,9 @@ func CreateWarmingRoomService(req *warmingModel.CreateWarmingRoomRequest) (*warm
 
 	// HUMAN_VS_BOT specific validation
 	if req.RoomType == "HUMAN_VS_BOT" {
-		// Validate receiver (bot instance)
-		if strings.TrimSpace(req.ReceiverInstanceID) == "" {
-			return nil, ErrRoomReceiverRequired
+		// Validate sender (the bot that will auto-reply)
+		if strings.TrimSpace(req.SenderInstanceID) == "" {
+			return nil, ErrRoomSenderRequired
 		}
 
 		// Validate whitelisted number
@@ -93,16 +93,16 @@ func CreateWarmingRoomService(req *warmingModel.CreateWarmingRoomRequest) (*warm
 			return nil, errors.New("whitelisted_number is required for HUMAN_VS_BOT")
 		}
 
-		// Validate receiver instance exists, online, and available
-		receiverInstance, err := model.GetInstanceByInstanceID(req.ReceiverInstanceID)
+		// Validate sender instance exists, online, and available
+		senderInstance, err := model.GetInstanceByInstanceID(req.SenderInstanceID)
 		if err != nil {
-			return nil, fmt.Errorf("receiver instance not found: %s", req.ReceiverInstanceID)
+			return nil, fmt.Errorf("sender instance not found: %s", req.SenderInstanceID)
 		}
-		if receiverInstance.Status != "online" {
-			return nil, fmt.Errorf("receiver instance '%s' is not online (status: %s)", req.ReceiverInstanceID, receiverInstance.Status)
+		if senderInstance.Status != "online" {
+			return nil, fmt.Errorf("sender instance '%s' is not online (status: %s)", req.SenderInstanceID, senderInstance.Status)
 		}
-		if !receiverInstance.Used {
-			return nil, fmt.Errorf("receiver instance '%s' is not available (used=false)", req.ReceiverInstanceID)
+		if !senderInstance.Used {
+			return nil, fmt.Errorf("sender instance '%s' is not available (used=false)", req.SenderInstanceID)
 		}
 
 		// Set default reply delays if not provided
@@ -115,6 +115,9 @@ func CreateWarmingRoomService(req *warmingModel.CreateWarmingRoomRequest) (*warm
 		if req.ReplyDelayMax < req.ReplyDelayMin {
 			return nil, errors.New("reply_delay_max must be >= reply_delay_min")
 		}
+
+		// Receiver not needed for HUMAN_VS_BOT (human is the receiver)
+		req.ReceiverInstanceID = ""
 	}
 
 	// Validate script

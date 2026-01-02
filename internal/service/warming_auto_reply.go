@@ -10,6 +10,7 @@ import (
 	"gowa-yourself/config"
 	"gowa-yourself/internal/helper"
 	warmingModel "gowa-yourself/internal/model/warming"
+	"gowa-yourself/internal/service/ai"
 	"gowa-yourself/internal/ws"
 )
 
@@ -30,6 +31,11 @@ func HandleIncomingMessage(instanceID, sender, messageText string) error {
 
 	if room == nil {
 		return nil
+	}
+
+	// Save incoming human message to conversation history
+	if err := warmingModel.SaveHumanMessage(room.ID, instanceID, sender, messageText); err != nil {
+		log.Printf("[HUMAN_VS_BOT] Warning: failed to save human message: %v", err)
 	}
 
 	// Rate limiting: check cooldown
@@ -54,13 +60,41 @@ func HandleIncomingMessage(instanceID, sender, messageText string) error {
 
 func processAutoReply(room *warmingModel.WarmingRoom, instanceID, sender string) {
 	delay := calculateDelay(room)
-
 	time.Sleep(delay)
 
-	reply, lineID, err := getScriptReply(room)
-	if err != nil {
-		log.Printf("[HUMAN_VS_BOT] Error getting script reply: %v", err)
-		return
+	var reply string
+	var lineID int64
+	var err error
+
+	// Decide: AI or Script?
+	if room.AIEnabled && config.AIEnabled {
+		// Try AI first
+		reply, err = getAIReply(room)
+		if err != nil {
+			log.Printf("[HUMAN_VS_BOT] AI failed: %v", err)
+
+			// Fallback to script if enabled
+			if room.FallbackToScript {
+				log.Printf("[HUMAN_VS_BOT] Falling back to script")
+				reply, lineID, err = getScriptReply(room)
+				if err != nil {
+					log.Printf("[HUMAN_VS_BOT] Script also failed: %v", err)
+					return
+				}
+			} else {
+				log.Printf("[HUMAN_VS_BOT] Fallback disabled, skipping reply")
+				return
+			}
+		}
+		// AI success, lineID = 0 (not from script)
+		lineID = 0
+	} else {
+		// Script mode (existing behavior)
+		reply, lineID, err = getScriptReply(room)
+		if err != nil {
+			log.Printf("[HUMAN_VS_BOT] Error getting script reply: %v", err)
+			return
+		}
 	}
 
 	if reply == "" {
@@ -71,6 +105,38 @@ func processAutoReply(room *warmingModel.WarmingRoom, instanceID, sender string)
 		log.Printf("[HUMAN_VS_BOT] Error sending reply: %v", err)
 		return
 	}
+}
+
+func getAIReply(room *warmingModel.WarmingRoom) (string, error) {
+	// Get conversation history
+	history, err := warmingModel.GetConversationHistory(room.ID, config.AIConversationHistoryLimit)
+	if err != nil {
+		return "", fmt.Errorf("failed to get conversation history: %w", err)
+	}
+
+	// Use room's AI configuration or defaults
+	systemPrompt := room.AISystemPrompt
+	if systemPrompt == "" {
+		systemPrompt = "You are a helpful customer service assistant. Be friendly, concise, and professional."
+	}
+
+	temperature := room.AITemperature
+	if temperature == 0 {
+		temperature = config.AIDefaultTemperature
+	}
+
+	maxTokens := room.AIMaxTokens
+	if maxTokens == 0 {
+		maxTokens = config.AIDefaultMaxTokens
+	}
+
+	// Generate AI reply
+	reply, err := ai.GenerateReply(systemPrompt, history, temperature, maxTokens)
+	if err != nil {
+		return "", fmt.Errorf("AI generation failed: %w", err)
+	}
+
+	return reply, nil
 }
 
 func getScriptReply(room *warmingModel.WarmingRoom) (string, int64, error) {
@@ -113,7 +179,7 @@ func calculateDelay(room *warmingModel.WarmingRoom) time.Duration {
 
 func sendReply(instanceID, recipient, message string, lineID int64, room *warmingModel.WarmingRoom) error {
 	if !room.SendRealMessage {
-		warmingModel.CreateWarmingLog(room.ID, lineID, instanceID, recipient, message, "SUCCESS", "dry-run mode")
+		warmingModel.CreateWarmingLog(room.ID, lineID, instanceID, recipient, message, "SUCCESS", "dry-run mode", "bot")
 		publishHumanVsBotEvent(room, lineID, instanceID, recipient, message, "SUCCESS", "dry-run mode")
 		return nil
 	}
@@ -121,12 +187,12 @@ func sendReply(instanceID, recipient, message string, lineID int64, room *warmin
 	success, errMsg := SendWarmingMessageToPhone(instanceID, recipient, message)
 
 	if !success {
-		warmingModel.CreateWarmingLog(room.ID, lineID, instanceID, recipient, message, "FAILED", errMsg)
+		warmingModel.CreateWarmingLog(room.ID, lineID, instanceID, recipient, message, "FAILED", errMsg, "bot")
 		publishHumanVsBotEvent(room, lineID, instanceID, recipient, message, "FAILED", errMsg)
 		return errors.New(errMsg)
 	}
 
-	warmingModel.CreateWarmingLog(room.ID, lineID, instanceID, recipient, message, "SUCCESS", "")
+	warmingModel.CreateWarmingLog(room.ID, lineID, instanceID, recipient, message, "SUCCESS", "", "bot")
 	publishHumanVsBotEvent(room, lineID, instanceID, recipient, message, "SUCCESS", "")
 
 	return nil

@@ -51,10 +51,15 @@ func SendWarmingMessage(senderInstanceID, receiverInstanceID, message string) (b
 		return false, "receiver JID not found"
 	}
 
-	// Parse receiver JID
+	// Parse receiver JID and ensure it has no device part
 	recipientJID, err := types.ParseJID(receiverSession.JID)
 	if err != nil {
 		return false, fmt.Sprintf("invalid receiver JID: %v", err)
+	}
+	// Clean device part from JID
+	recipientJID = types.JID{
+		User:   recipientJID.User,
+		Server: recipientJID.Server,
 	}
 
 	return sendWarmingMessageInternal(senderSession, recipientJID, message)
