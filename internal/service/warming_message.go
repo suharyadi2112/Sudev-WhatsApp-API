@@ -51,12 +51,43 @@ func SendWarmingMessage(senderInstanceID, receiverInstanceID, message string) (b
 		return false, "receiver JID not found"
 	}
 
-	// Parse receiver JID
+	// Parse receiver JID and ensure it has no device part
 	recipientJID, err := types.ParseJID(receiverSession.JID)
 	if err != nil {
 		return false, fmt.Sprintf("invalid receiver JID: %v", err)
 	}
+	// Clean device part from JID
+	recipientJID = types.JID{
+		User:   recipientJID.User,
+		Server: recipientJID.Server,
+	}
 
+	return sendWarmingMessageInternal(senderSession, recipientJID, message)
+}
+
+// SendWarmingMessageToPhone sends a WhatsApp message to a phone number
+// Returns (success bool, error message string)
+func SendWarmingMessageToPhone(senderInstanceID, phoneNumber, message string) (bool, string) {
+	senderSession, err := GetSession(senderInstanceID)
+	if err != nil {
+		return false, fmt.Sprintf("sender session not found: %v", err)
+	}
+
+	if !senderSession.IsConnected || !senderSession.Client.IsConnected() {
+		return false, "sender not connected"
+	}
+
+	if senderSession.Client.Store.ID == nil {
+		return false, "sender not logged in"
+	}
+
+	recipientJID := types.NewJID(phoneNumber, types.DefaultUserServer)
+
+	return sendWarmingMessageInternal(senderSession, recipientJID, message)
+}
+
+// sendWarmingMessageInternal contains the shared logic for sending messages with typing simulation
+func sendWarmingMessageInternal(senderSession *model.Session, recipientJID types.JID, message string) (bool, string) {
 	ctx := context.Background()
 
 	if !helper.ShouldSkipValidation(recipientJID.User) {
@@ -127,7 +158,7 @@ func SendWarmingMessage(senderInstanceID, receiverInstanceID, message string) (b
 		Conversation: &message,
 	}
 
-	_, err = senderSession.Client.SendMessage(ctx, recipientJID, msg)
+	_, err := senderSession.Client.SendMessage(ctx, recipientJID, msg)
 	if err != nil {
 		return false, fmt.Sprintf("failed to send message: %v", err)
 	}

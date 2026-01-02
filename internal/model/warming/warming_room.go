@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"gowa-yourself/database"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,34 +16,58 @@ type WarmingRoom struct {
 	Name               string
 	SenderInstanceID   string
 	ReceiverInstanceID string
-	ScriptID           int64
+	ScriptID           int64 // Mandatory: required for all room types
 	CurrentSequence    int
 	Status             string // STOPPED, ACTIVE, PAUSED, FINISHED
 	IntervalMinSeconds int
 	IntervalMaxSeconds int
 	SendRealMessage    bool
-	NextRunAt          sql.NullTime
-	LastRunAt          sql.NullTime
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	RoomType           string
+	WhitelistedNumber  sql.NullString
+	ReplyDelayMin      int
+	ReplyDelayMax      int
+	// AI Configuration
+	AIEnabled        bool
+	AIProvider       string
+	AIModel          string
+	AISystemPrompt   string
+	AITemperature    float64
+	AIMaxTokens      int
+	FallbackToScript bool
+	NextRunAt        sql.NullTime
+	LastRunAt        sql.NullTime
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // WarmingRoomResponse for JSON response
 type WarmingRoomResponse struct {
-	ID                 string     `json:"id"`
-	Name               string     `json:"name"`
-	SenderInstanceID   string     `json:"senderInstanceId"`
-	ReceiverInstanceID string     `json:"receiverInstanceId"`
-	ScriptID           int64      `json:"scriptId"`
-	CurrentSequence    int        `json:"currentSequence"`
-	Status             string     `json:"status"`
-	IntervalMinSeconds int        `json:"intervalMinSeconds"`
-	IntervalMaxSeconds int        `json:"intervalMaxSeconds"`
-	SendRealMessage    bool       `json:"sendRealMessage"`
-	NextRunAt          *time.Time `json:"nextRunAt"`
-	LastRunAt          *time.Time `json:"lastRunAt"`
-	CreatedAt          time.Time  `json:"createdAt"`
-	UpdatedAt          time.Time  `json:"updatedAt"`
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	SenderInstanceID   string `json:"senderInstanceId"`
+	ReceiverInstanceID string `json:"receiverInstanceId"`
+	ScriptID           int64  `json:"scriptId"`
+	CurrentSequence    int    `json:"currentSequence"`
+	Status             string `json:"status"`
+	IntervalMinSeconds int    `json:"intervalMinSeconds"`
+	IntervalMaxSeconds int    `json:"intervalMaxSeconds"`
+	SendRealMessage    bool   `json:"sendRealMessage"`
+	RoomType           string `json:"roomType"`
+	WhitelistedNumber  string `json:"whitelistedNumber,omitempty"`
+	ReplyDelayMin      int    `json:"replyDelayMin"`
+	ReplyDelayMax      int    `json:"replyDelayMax"`
+	// AI Configuration (New)
+	AIEnabled        bool       `json:"aiEnabled"`
+	AIProvider       string     `json:"aiProvider,omitempty"`
+	AIModel          string     `json:"aiModel,omitempty"`
+	AISystemPrompt   string     `json:"aiSystemPrompt,omitempty"`
+	AITemperature    float64    `json:"aiTemperature,omitempty"`
+	AIMaxTokens      int        `json:"aiMaxTokens,omitempty"`
+	FallbackToScript bool       `json:"fallbackToScript"`
+	NextRunAt        *time.Time `json:"nextRunAt"`
+	LastRunAt        *time.Time `json:"lastRunAt"`
+	CreatedAt        time.Time  `json:"createdAt"`
+	UpdatedAt        time.Time  `json:"updatedAt"`
 }
 
 // CreateWarmingRoomRequest for POST request
@@ -54,6 +79,18 @@ type CreateWarmingRoomRequest struct {
 	IntervalMinSeconds int    `json:"intervalMinSeconds"`
 	IntervalMaxSeconds int    `json:"intervalMaxSeconds"`
 	SendRealMessage    bool   `json:"sendRealMessage"`
+	RoomType           string `json:"roomType,omitempty"`
+	WhitelistedNumber  string `json:"whitelistedNumber,omitempty"`
+	ReplyDelayMin      int    `json:"replyDelayMin,omitempty"`
+	ReplyDelayMax      int    `json:"replyDelayMax,omitempty"`
+	// AI Configuration
+	AIEnabled        bool    `json:"aiEnabled,omitempty"`
+	AIProvider       string  `json:"aiProvider,omitempty"`
+	AIModel          string  `json:"aiModel,omitempty"`
+	AISystemPrompt   string  `json:"aiSystemPrompt,omitempty"`
+	AITemperature    float64 `json:"aiTemperature,omitempty"`
+	AIMaxTokens      int     `json:"aiMaxTokens,omitempty"`
+	FallbackToScript bool    `json:"fallbackToScript,omitempty"`
 }
 
 // UpdateWarmingRoomRequest for PUT request
@@ -63,17 +100,97 @@ type UpdateWarmingRoomRequest struct {
 	IntervalMinSeconds int    `json:"intervalMinSeconds"`
 	IntervalMaxSeconds int    `json:"intervalMaxSeconds"`
 	SendRealMessage    bool   `json:"sendRealMessage"`
+	RoomType           string `json:"roomType,omitempty"`
+	WhitelistedNumber  string `json:"whitelistedNumber,omitempty"`
+	ReplyDelayMin      int    `json:"replyDelayMin,omitempty"`
+	ReplyDelayMax      int    `json:"replyDelayMax,omitempty"`
+	// AI Configuration
+	AIEnabled        *bool    `json:"aiEnabled,omitempty"`
+	AIProvider       string   `json:"aiProvider,omitempty"`
+	AIModel          string   `json:"aiModel,omitempty"`
+	AISystemPrompt   string   `json:"aiSystemPrompt,omitempty"`
+	AITemperature    *float64 `json:"aiTemperature,omitempty"`
+	AIMaxTokens      *int     `json:"aiMaxTokens,omitempty"`
+	FallbackToScript *bool    `json:"fallbackToScript,omitempty"`
+}
+
+// CheckDuplicateWhitelistedNumber checks if whitelisted number is already used in another active HUMAN_VS_BOT room
+func CheckDuplicateWhitelistedNumber(whitelistedNumber string, excludeRoomID *uuid.UUID) (bool, error) {
+	if whitelistedNumber == "" {
+		return false, nil
+	}
+
+	var query string
+	var args []interface{}
+
+	if excludeRoomID != nil {
+		query = `
+			SELECT COUNT(*) FROM warming_rooms
+			WHERE room_type = 'HUMAN_VS_BOT'
+			  AND whitelisted_number = $1
+			  AND status IN ('ACTIVE', 'PAUSED')
+			  AND id != $2
+		`
+		args = []interface{}{whitelistedNumber, excludeRoomID}
+	} else {
+		query = `
+			SELECT COUNT(*) FROM warming_rooms
+			WHERE room_type = 'HUMAN_VS_BOT'
+			  AND whitelisted_number = $1
+			  AND status IN ('ACTIVE', 'PAUSED')
+		`
+		args = []interface{}{whitelistedNumber}
+	}
+
+	var count int
+	err := database.AppDB.QueryRow(query, args...).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to check duplicate whitelisted number: %w", err)
+	}
+
+	return count > 0, nil
 }
 
 // CreateWarmingRoom inserts new room
 func CreateWarmingRoom(req *CreateWarmingRoomRequest) (*WarmingRoom, error) {
+	// Normalize whitelisted number for HUMAN_VS_BOT rooms (08xxx -> 628xxx)
+	if req.RoomType == "HUMAN_VS_BOT" && req.WhitelistedNumber != "" {
+		// Use existing FormatPhoneNumber logic to normalize
+		cleaned := strings.ReplaceAll(req.WhitelistedNumber, " ", "")
+		cleaned = strings.ReplaceAll(cleaned, "-", "")
+		cleaned = strings.TrimPrefix(cleaned, "+")
+
+		// Convert 08xxx to 628xxx
+		if strings.HasPrefix(cleaned, "08") {
+			cleaned = "62" + cleaned[1:]
+		} else if strings.HasPrefix(cleaned, "8") && !strings.HasPrefix(cleaned, "62") {
+			cleaned = "62" + cleaned
+		}
+
+		req.WhitelistedNumber = cleaned
+
+		// Check for duplicate whitelisted number
+		isDuplicate, err := CheckDuplicateWhitelistedNumber(req.WhitelistedNumber, nil)
+		if err != nil {
+			return nil, err
+		}
+		if isDuplicate {
+			return nil, fmt.Errorf("whitelisted number %s is already used in another active HUMAN_VS_BOT room", req.WhitelistedNumber)
+		}
+	}
+
 	query := `
 		INSERT INTO warming_rooms 
-		(name, sender_instance_id, receiver_instance_id, script_id, 
-		 interval_min_seconds, interval_max_seconds, send_real_message, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-		RETURNING id, name, sender_instance_id, receiver_instance_id, script_id, 
+		(name, sender_instance_id, receiver_instance_id, script_id,
+		 interval_min_seconds, interval_max_seconds, send_real_message,
+		 room_type, whitelisted_number, reply_delay_min, reply_delay_max,
+		 ai_enabled, ai_provider, ai_model, ai_system_prompt, ai_temperature, ai_max_tokens, fallback_to_script,
+		 created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())
+		RETURNING id, name, sender_instance_id, receiver_instance_id, script_id,
 		          current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
+		          room_type, whitelisted_number, reply_delay_min, reply_delay_max,
+		          ai_enabled, ai_provider, ai_model, ai_system_prompt, ai_temperature, ai_max_tokens, fallback_to_script,
 		          next_run_at, last_run_at, created_at, updated_at
 	`
 
@@ -87,6 +204,17 @@ func CreateWarmingRoom(req *CreateWarmingRoomRequest) (*WarmingRoom, error) {
 		req.IntervalMinSeconds,
 		req.IntervalMaxSeconds,
 		req.SendRealMessage,
+		req.RoomType,
+		sql.NullString{String: req.WhitelistedNumber, Valid: req.WhitelistedNumber != ""},
+		req.ReplyDelayMin,
+		req.ReplyDelayMax,
+		req.AIEnabled,
+		req.AIProvider,
+		req.AIModel,
+		req.AISystemPrompt,
+		req.AITemperature,
+		req.AIMaxTokens,
+		req.FallbackToScript,
 	).Scan(
 		&room.ID,
 		&room.Name,
@@ -98,6 +226,17 @@ func CreateWarmingRoom(req *CreateWarmingRoomRequest) (*WarmingRoom, error) {
 		&room.IntervalMinSeconds,
 		&room.IntervalMaxSeconds,
 		&room.SendRealMessage,
+		&room.RoomType,
+		&room.WhitelistedNumber,
+		&room.ReplyDelayMin,
+		&room.ReplyDelayMax,
+		&room.AIEnabled,
+		&room.AIProvider,
+		&room.AIModel,
+		&room.AISystemPrompt,
+		&room.AITemperature,
+		&room.AIMaxTokens,
+		&room.FallbackToScript,
 		&room.NextRunAt,
 		&room.LastRunAt,
 		&room.CreatedAt,
@@ -120,6 +259,8 @@ func GetAllWarmingRooms(status string) ([]WarmingRoom, error) {
 		query = `
 			SELECT id, name, sender_instance_id, receiver_instance_id, script_id,
 			       current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
+			       room_type, whitelisted_number, reply_delay_min, reply_delay_max,
+			       ai_enabled, ai_provider, ai_model, ai_system_prompt, ai_temperature, ai_max_tokens, fallback_to_script,
 			       next_run_at, last_run_at, created_at, updated_at
 			FROM warming_rooms
 			WHERE status = $1
@@ -130,6 +271,8 @@ func GetAllWarmingRooms(status string) ([]WarmingRoom, error) {
 		query = `
 			SELECT id, name, sender_instance_id, receiver_instance_id, script_id,
 			       current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
+			       room_type, whitelisted_number, reply_delay_min, reply_delay_max,
+			       ai_enabled, ai_provider, ai_model, ai_system_prompt, ai_temperature, ai_max_tokens, fallback_to_script,
 			       next_run_at, last_run_at, created_at, updated_at
 			FROM warming_rooms
 			ORDER BY created_at DESC
@@ -156,6 +299,17 @@ func GetAllWarmingRooms(status string) ([]WarmingRoom, error) {
 			&room.IntervalMinSeconds,
 			&room.IntervalMaxSeconds,
 			&room.SendRealMessage,
+			&room.RoomType,
+			&room.WhitelistedNumber,
+			&room.ReplyDelayMin,
+			&room.ReplyDelayMax,
+			&room.AIEnabled,
+			&room.AIProvider,
+			&room.AIModel,
+			&room.AISystemPrompt,
+			&room.AITemperature,
+			&room.AIMaxTokens,
+			&room.FallbackToScript,
 			&room.NextRunAt,
 			&room.LastRunAt,
 			&room.CreatedAt,
@@ -180,6 +334,8 @@ func GetWarmingRoomByID(id string) (*WarmingRoom, error) {
 	query := `
 		SELECT id, name, sender_instance_id, receiver_instance_id, script_id,
 		       current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
+		       room_type, whitelisted_number, reply_delay_min, reply_delay_max,
+		       ai_enabled, ai_provider, ai_model, ai_system_prompt, ai_temperature, ai_max_tokens, fallback_to_script,
 		       next_run_at, last_run_at, created_at, updated_at
 		FROM warming_rooms
 		WHERE id = $1
@@ -197,6 +353,17 @@ func GetWarmingRoomByID(id string) (*WarmingRoom, error) {
 		&room.IntervalMinSeconds,
 		&room.IntervalMaxSeconds,
 		&room.SendRealMessage,
+		&room.RoomType,
+		&room.WhitelistedNumber,
+		&room.ReplyDelayMin,
+		&room.ReplyDelayMax,
+		&room.AIEnabled,
+		&room.AIProvider,
+		&room.AIModel,
+		&room.AISystemPrompt,
+		&room.AITemperature,
+		&room.AIMaxTokens,
+		&room.FallbackToScript,
 		&room.NextRunAt,
 		&room.LastRunAt,
 		&room.CreatedAt,
@@ -220,11 +387,47 @@ func UpdateWarmingRoom(id string, req *UpdateWarmingRoomRequest) error {
 		return fmt.Errorf("invalid room ID format: %w", err)
 	}
 
+	// Check for duplicate whitelisted number if updating HUMAN_VS_BOT room
+	if req.RoomType == "HUMAN_VS_BOT" && req.WhitelistedNumber != "" {
+		isDuplicate, err := CheckDuplicateWhitelistedNumber(req.WhitelistedNumber, &roomID)
+		if err != nil {
+			return err
+		}
+		if isDuplicate {
+			return fmt.Errorf("whitelisted number %s is already used in another active HUMAN_VS_BOT room", req.WhitelistedNumber)
+		}
+	}
+
 	query := `
 		UPDATE warming_rooms
-		SET name = $1, script_id = $2, interval_min_seconds = $3, interval_max_seconds = $4, send_real_message = $5, updated_at = NOW()
-		WHERE id = $6
+		SET name = $1, script_id = $2, interval_min_seconds = $3, interval_max_seconds = $4, send_real_message = $5,
+		    room_type = $6, whitelisted_number = $7, reply_delay_min = $8, reply_delay_max = $9,
+		    ai_enabled = $10, ai_provider = $11, ai_model = $12, ai_system_prompt = $13,
+		    ai_temperature = $14, ai_max_tokens = $15, fallback_to_script = $16,
+		    updated_at = NOW()
+		WHERE id = $17
 	`
+
+	// Handle nullable AI fields with defaults
+	aiEnabled := false
+	if req.AIEnabled != nil {
+		aiEnabled = *req.AIEnabled
+	}
+
+	aiTemperature := 0.7
+	if req.AITemperature != nil {
+		aiTemperature = *req.AITemperature
+	}
+
+	aiMaxTokens := 150
+	if req.AIMaxTokens != nil {
+		aiMaxTokens = *req.AIMaxTokens
+	}
+
+	fallbackToScript := true
+	if req.FallbackToScript != nil {
+		fallbackToScript = *req.FallbackToScript
+	}
 
 	result, err := database.AppDB.Exec(
 		query,
@@ -233,6 +436,17 @@ func UpdateWarmingRoom(id string, req *UpdateWarmingRoomRequest) error {
 		req.IntervalMinSeconds,
 		req.IntervalMaxSeconds,
 		req.SendRealMessage,
+		req.RoomType,
+		sql.NullString{String: req.WhitelistedNumber, Valid: req.WhitelistedNumber != ""},
+		req.ReplyDelayMin,
+		req.ReplyDelayMax,
+		aiEnabled,
+		req.AIProvider,
+		req.AIModel,
+		req.AISystemPrompt,
+		aiTemperature,
+		aiMaxTokens,
+		fallbackToScript,
 		roomID,
 	)
 	if err != nil {
@@ -284,6 +498,24 @@ func UpdateRoomStatus(id string, status string, nextRunAt *time.Time) error {
 		return fmt.Errorf("invalid room ID format: %w", err)
 	}
 
+	// If activating a HUMAN_VS_BOT room, check for duplicate whitelisted number
+	if status == "ACTIVE" {
+		room, err := GetWarmingRoomByID(id)
+		if err != nil {
+			return fmt.Errorf("failed to get room: %w", err)
+		}
+
+		if room.RoomType == "HUMAN_VS_BOT" && room.WhitelistedNumber.Valid && room.WhitelistedNumber.String != "" {
+			isDuplicate, err := CheckDuplicateWhitelistedNumber(room.WhitelistedNumber.String, &roomID)
+			if err != nil {
+				return err
+			}
+			if isDuplicate {
+				return fmt.Errorf("cannot activate room: whitelisted number %s is already used in another active HUMAN_VS_BOT room", room.WhitelistedNumber.String)
+			}
+		}
+	}
+
 	var query string
 	var args []interface{}
 
@@ -331,6 +563,11 @@ func ToWarmingRoomResponse(room WarmingRoom) WarmingRoomResponse {
 		lastRunAt = &room.LastRunAt.Time
 	}
 
+	var whitelistedNumber string
+	if room.WhitelistedNumber.Valid {
+		whitelistedNumber = room.WhitelistedNumber.String
+	}
+
 	return WarmingRoomResponse{
 		ID:                 room.ID.String(),
 		Name:               room.Name,
@@ -342,10 +579,22 @@ func ToWarmingRoomResponse(room WarmingRoom) WarmingRoomResponse {
 		IntervalMinSeconds: room.IntervalMinSeconds,
 		IntervalMaxSeconds: room.IntervalMaxSeconds,
 		SendRealMessage:    room.SendRealMessage,
-		NextRunAt:          nextRunAt,
-		LastRunAt:          lastRunAt,
-		CreatedAt:          room.CreatedAt,
-		UpdatedAt:          room.UpdatedAt,
+		RoomType:           room.RoomType,
+		WhitelistedNumber:  whitelistedNumber,
+		ReplyDelayMin:      room.ReplyDelayMin,
+		ReplyDelayMax:      room.ReplyDelayMax,
+		// AI Configuration (New)
+		AIEnabled:        room.AIEnabled,
+		AIProvider:       room.AIProvider,
+		AIModel:          room.AIModel,
+		AISystemPrompt:   room.AISystemPrompt,
+		AITemperature:    room.AITemperature,
+		AIMaxTokens:      room.AIMaxTokens,
+		FallbackToScript: room.FallbackToScript,
+		NextRunAt:        nextRunAt,
+		LastRunAt:        lastRunAt,
+		CreatedAt:        room.CreatedAt,
+		UpdatedAt:        room.UpdatedAt,
 	}
 }
 
@@ -354,9 +603,13 @@ func GetActiveRoomsForWorker(limit int) ([]WarmingRoom, error) {
 	query := `
 		SELECT id, name, sender_instance_id, receiver_instance_id, script_id,
 		       current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
+		       room_type, whitelisted_number, reply_delay_min, reply_delay_max,
+		       ai_enabled, ai_provider, ai_model, ai_system_prompt, ai_temperature, ai_max_tokens, fallback_to_script,
 		       next_run_at, last_run_at, created_at, updated_at
 		FROM warming_rooms
-		WHERE status = 'ACTIVE' AND next_run_at <= NOW()
+		WHERE status = 'ACTIVE' 
+		  AND room_type != 'HUMAN_VS_BOT'
+		  AND next_run_at <= NOW()
 		ORDER BY next_run_at ASC
 		LIMIT $1
 		FOR UPDATE SKIP LOCKED
@@ -382,6 +635,17 @@ func GetActiveRoomsForWorker(limit int) ([]WarmingRoom, error) {
 			&room.IntervalMinSeconds,
 			&room.IntervalMaxSeconds,
 			&room.SendRealMessage,
+			&room.RoomType,
+			&room.WhitelistedNumber,
+			&room.ReplyDelayMin,
+			&room.ReplyDelayMax,
+			&room.AIEnabled,
+			&room.AIProvider,
+			&room.AIModel,
+			&room.AISystemPrompt,
+			&room.AITemperature,
+			&room.AIMaxTokens,
+			&room.FallbackToScript,
 			&room.NextRunAt,
 			&room.LastRunAt,
 			&room.CreatedAt,
@@ -446,4 +710,57 @@ func RestartRoom(id string) error {
 	}
 
 	return nil
+}
+
+func GetActiveHumanRoomBySender(senderNumber string) (*WarmingRoom, error) {
+	query := `
+		SELECT id, name, sender_instance_id, receiver_instance_id, script_id,
+		       current_sequence, status, interval_min_seconds, interval_max_seconds, send_real_message,
+		       room_type, whitelisted_number, reply_delay_min, reply_delay_max,
+		       ai_enabled, ai_provider, ai_model, ai_system_prompt, ai_temperature, ai_max_tokens, fallback_to_script,
+		       next_run_at, last_run_at, created_at, updated_at
+		FROM warming_rooms
+		WHERE room_type = 'HUMAN_VS_BOT' 
+		  AND status = 'ACTIVE' 
+		  AND whitelisted_number = $1
+		LIMIT 1
+	`
+
+	room := &WarmingRoom{}
+	err := database.AppDB.QueryRow(query, senderNumber).Scan(
+		&room.ID,
+		&room.Name,
+		&room.SenderInstanceID,
+		&room.ReceiverInstanceID,
+		&room.ScriptID,
+		&room.CurrentSequence,
+		&room.Status,
+		&room.IntervalMinSeconds,
+		&room.IntervalMaxSeconds,
+		&room.SendRealMessage,
+		&room.RoomType,
+		&room.WhitelistedNumber,
+		&room.ReplyDelayMin,
+		&room.ReplyDelayMax,
+		&room.AIEnabled,
+		&room.AIProvider,
+		&room.AIModel,
+		&room.AISystemPrompt,
+		&room.AITemperature,
+		&room.AIMaxTokens,
+		&room.FallbackToScript,
+		&room.NextRunAt,
+		&room.LastRunAt,
+		&room.CreatedAt,
+		&room.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get active human room: %w", err)
+	}
+
+	return room, nil
 }

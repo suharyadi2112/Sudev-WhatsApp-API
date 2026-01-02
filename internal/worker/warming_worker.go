@@ -73,7 +73,7 @@ func executeRoom(room warmingModel.WarmingRoom, hub ws.RealtimePublisher) error 
 		return fmt.Errorf("failed to get script line: %w", err)
 	}
 
-	message := renderSpintax(line.MessageContent)
+	message := helper.RenderSpintax(line.MessageContent)
 
 	var senderID, receiverID string
 	if line.ActorRole == "ACTOR_A" {
@@ -93,7 +93,7 @@ func executeRoom(room warmingModel.WarmingRoom, hub ws.RealtimePublisher) error 
 		logStatus = "FAILED"
 	}
 
-	if err := warmingModel.CreateWarmingLog(room.ID, line.ID, senderID, receiverID, message, logStatus, errMsg); err != nil {
+	if err := warmingModel.CreateWarmingLog(room.ID, line.ID, senderID, receiverID, message, logStatus, errMsg, "bot"); err != nil {
 		log.Printf("⚠️ Failed to create log: %v", err)
 	}
 
@@ -139,63 +139,6 @@ func executeRoom(room warmingModel.WarmingRoom, hub ws.RealtimePublisher) error 
 	return nil
 }
 
-// renderSpintax renders spintax format {option1|option2} and dynamic variables
-func renderSpintax(text string) string {
-	// First, render dynamic variables
-	result := renderDynamicVariables(text)
-
-	// Then, render spintax
-	for {
-		start := strings.Index(result, "{")
-		if start == -1 {
-			break
-		}
-		end := strings.Index(result[start:], "}")
-		if end == -1 {
-			break
-		}
-		end += start
-
-		spintax := result[start+1 : end]
-		options := strings.Split(spintax, "|")
-		chosen := options[rand.Intn(len(options))]
-
-		result = result[:start] + chosen + result[end+1:]
-	}
-	return result
-}
-
-func renderDynamicVariables(text string) string {
-	now := time.Now()
-
-	hour := now.Hour()
-	var timeGreeting string
-	switch {
-	case hour >= 5 && hour < 10:
-		timeGreeting = "Pagi"
-	case hour >= 10 && hour < 15:
-		timeGreeting = "Siang"
-	case hour >= 15 && hour < 18:
-		timeGreeting = "Sore"
-	default:
-		timeGreeting = "Malam"
-	}
-
-	dayNames := []string{"Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"}
-	dayName := dayNames[now.Weekday()]
-
-	monthNames := []string{"", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-		"Juli", "Agustus", "September", "Oktober", "November", "Desember"}
-	date := fmt.Sprintf("%d %s %d", now.Day(), monthNames[now.Month()], now.Year())
-
-	result := text
-	result = strings.ReplaceAll(result, "{TIME_GREETING}", timeGreeting)
-	result = strings.ReplaceAll(result, "{DAY_NAME}", dayName)
-	result = strings.ReplaceAll(result, "{DATE}", date)
-
-	return result
-}
-
 func sendWhatsAppMessage(senderID, receiverID, message string, sendReal bool) (bool, string) {
 	if !sendReal {
 		log.Printf("🧪 [SIMULATION] %s → %s: %s", senderID, receiverID, message)
@@ -205,7 +148,6 @@ func sendWhatsAppMessage(senderID, receiverID, message string, sendReal bool) (b
 
 	log.Printf("📤 [REAL] Sending: %s → %s: %s", senderID, receiverID, message)
 
-	// Use shared service function
 	success, errMsg := service.SendWarmingMessage(senderID, receiverID, message)
 
 	if success {

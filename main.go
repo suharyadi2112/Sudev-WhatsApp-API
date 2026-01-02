@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,7 +52,65 @@ func main() {
 	config.EnableWebsocketIncomingMessage = (wsEnv == "true")
 	config.EnableWebhook = (webhookEnv == "true")
 
-	log.Printf("feature flags -> websocket_incoming_msg: %v, webhook: %v", config.EnableWebsocketIncomingMessage, config.EnableWebhook)
+	autoReplyEnv := os.Getenv("WARMING_AUTO_REPLY_ENABLED")
+	config.WarmingAutoReplyEnabled = (autoReplyEnv == "true")
+
+	cooldownStr := os.Getenv("WARMING_AUTO_REPLY_COOLDOWN")
+	if cooldownStr != "" {
+		if cooldown, err := strconv.Atoi(cooldownStr); err == nil && cooldown > 0 {
+			config.WarmingAutoReplyCooldown = cooldown
+		} else {
+			config.WarmingAutoReplyCooldown = 60 // default 60 seconds
+		}
+	} else {
+		config.WarmingAutoReplyCooldown = 60 // default 60 seconds
+	}
+
+	// AI Configuration
+	config.AIEnabled = os.Getenv("AI_ENABLED") == "true"
+	config.AIDefaultProvider = os.Getenv("AI_DEFAULT_PROVIDER")
+	if config.AIDefaultProvider == "" {
+		config.AIDefaultProvider = "gemini" // default to free Gemini
+	}
+
+	config.GeminiAPIKey = os.Getenv("GEMINI_API_KEY")
+	config.GeminiDefaultModel = os.Getenv("GEMINI_DEFAULT_MODEL")
+	if config.GeminiDefaultModel == "" {
+		config.GeminiDefaultModel = "gemini-1.5-flash"
+	}
+
+	if histLimit := os.Getenv("AI_CONVERSATION_HISTORY_LIMIT"); histLimit != "" {
+		if limit, err := strconv.Atoi(histLimit); err == nil && limit > 0 {
+			config.AIConversationHistoryLimit = limit
+		} else {
+			config.AIConversationHistoryLimit = 10
+		}
+	} else {
+		config.AIConversationHistoryLimit = 10
+	}
+
+	if temp := os.Getenv("AI_DEFAULT_TEMPERATURE"); temp != "" {
+		if t, err := strconv.ParseFloat(temp, 64); err == nil && t >= 0 && t <= 1 {
+			config.AIDefaultTemperature = t
+		} else {
+			config.AIDefaultTemperature = 0.7
+		}
+	} else {
+		config.AIDefaultTemperature = 0.7
+	}
+
+	if maxTokens := os.Getenv("AI_DEFAULT_MAX_TOKENS"); maxTokens != "" {
+		if tokens, err := strconv.Atoi(maxTokens); err == nil && tokens > 0 {
+			config.AIDefaultMaxTokens = tokens
+		} else {
+			config.AIDefaultMaxTokens = 150
+		}
+	} else {
+		config.AIDefaultMaxTokens = 150
+	}
+
+	log.Printf("feature flags -> websocket_incoming_msg: %v, webhook: %v, warming_auto_reply: %v, ai_enabled: %v",
+		config.EnableWebsocketIncomingMessage, config.EnableWebhook, config.WarmingAutoReplyEnabled, config.AIEnabled)
 
 	//jwt
 	jwtSecret := os.Getenv("JWT_SECRET")

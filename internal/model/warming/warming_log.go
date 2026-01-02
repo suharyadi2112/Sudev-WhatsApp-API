@@ -153,20 +153,28 @@ func ToWarmingLogResponse(log WarmingLog) WarmingLogResponse {
 	return resp
 }
 
-// CreateWarmingLog creates warming log entry (for worker)
-func CreateWarmingLog(roomID uuid.UUID, lineID int64, senderID, receiverID, message, status, errMsg string) error {
-	query := `
-		INSERT INTO warming_logs 
-		(room_id, script_line_id, sender_instance_id, receiver_instance_id, 
-		 message_content, status, error_message, executed_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-	`
-
-	var errMsgPtr *string
-	if errMsg != "" {
-		errMsgPtr = &errMsg
+// CreateWarmingLog creates a new warming log entry with sender type
+func CreateWarmingLog(roomID uuid.UUID, scriptLineID int64, senderInstanceID, receiverInstanceID, message, status, errorMessage, senderType string) error {
+	if senderType == "" {
+		senderType = "bot" // default to bot for backward compatibility
 	}
 
-	_, err := database.AppDB.Exec(query, roomID, lineID, senderID, receiverID, message, status, errMsgPtr)
-	return err
+	query := `
+		INSERT INTO warming_logs 
+		(room_id, script_line_id, sender_instance_id, receiver_instance_id, message_content, status, error_message, sender_type, executed_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+	`
+
+	// Use NULL for script_line_id if it's 0 (e.g., for human messages or AI replies)
+	var scriptLineIDPtr *int64
+	if scriptLineID != 0 {
+		scriptLineIDPtr = &scriptLineID
+	}
+
+	_, err := database.AppDB.Exec(query, roomID, scriptLineIDPtr, senderInstanceID, receiverInstanceID, message, status, errorMessage, senderType)
+	if err != nil {
+		return fmt.Errorf("failed to create warming log: %w", err)
+	}
+
+	return nil
 }

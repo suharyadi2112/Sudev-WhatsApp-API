@@ -220,6 +220,23 @@ func InitCustomSchema() {
 		ADD COLUMN IF NOT EXISTS send_real_message BOOLEAN NOT NULL DEFAULT false;
 
 		COMMENT ON COLUMN warming_rooms.send_real_message IS 'true = kirim WA asli, false = simulasi saja (dry-run mode)';
+		
+		-- HUMAN_VS_BOT feature columns
+		ALTER TABLE warming_rooms
+		ADD COLUMN IF NOT EXISTS room_type VARCHAR(20) NOT NULL DEFAULT 'BOT_VS_BOT'
+			CHECK (room_type IN ('BOT_VS_BOT', 'HUMAN_VS_BOT')),
+		ADD COLUMN IF NOT EXISTS whitelisted_number VARCHAR(50),
+		ADD COLUMN IF NOT EXISTS reply_delay_min INT NOT NULL DEFAULT 10,
+		ADD COLUMN IF NOT EXISTS reply_delay_max INT NOT NULL DEFAULT 60;
+		
+		COMMENT ON COLUMN warming_rooms.room_type IS 'BOT_VS_BOT: automated script exchange, HUMAN_VS_BOT: auto-reply to human';
+		COMMENT ON COLUMN warming_rooms.whitelisted_number IS 'Phone number allowed to trigger auto-reply (format: 6281234567890)';
+		COMMENT ON COLUMN warming_rooms.reply_delay_min IS 'Minimum delay in seconds before replying (HUMAN_VS_BOT mode)';
+		COMMENT ON COLUMN warming_rooms.reply_delay_max IS 'Maximum delay in seconds before replying (HUMAN_VS_BOT mode)';
+		
+		-- Indexes for HUMAN_VS_BOT queries
+		CREATE INDEX IF NOT EXISTS idx_rooms_type ON warming_rooms(room_type);
+		CREATE INDEX IF NOT EXISTS idx_rooms_whitelist ON warming_rooms(whitelisted_number);
 	`
 	if _, err := db.Exec(alterWarmingSchema); err != nil {
 		log.Fatalf("failed to alter warming schema: %v", err)
@@ -252,6 +269,46 @@ func InitCustomSchema() {
 	} else if count == 0 {
 		log.Println("Seeding initial warming templates...")
 		seedInitialTemplates(db)
+	}
+
+	// Add AI configuration fields to warming_rooms (if not exists)
+	_, err := db.Exec(`
+		ALTER TABLE warming_rooms 
+		ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT FALSE,
+		ADD COLUMN IF NOT EXISTS ai_provider VARCHAR(20) DEFAULT 'gemini',
+		ADD COLUMN IF NOT EXISTS ai_model VARCHAR(50) DEFAULT 'gemini-1.5-flash',
+		ADD COLUMN IF NOT EXISTS ai_system_prompt TEXT DEFAULT 'You are a helpful customer service assistant. Be friendly, concise, and professional.',
+		ADD COLUMN IF NOT EXISTS ai_temperature DECIMAL(3,2) DEFAULT 0.7,
+		ADD COLUMN IF NOT EXISTS ai_max_tokens INT DEFAULT 150,
+		ADD COLUMN IF NOT EXISTS fallback_to_script BOOLEAN DEFAULT TRUE
+	`)
+	if err != nil {
+		log.Printf("⚠️ Warning: Could not add AI fields to warming_rooms: %v", err)
+	} else {
+		log.Println("✅ AI configuration fields added to warming_rooms")
+	}
+
+	// Add sender_type field to warming_logs for AI context tracking
+	_, err = db.Exec(`
+		ALTER TABLE warming_logs 
+		ADD COLUMN IF NOT EXISTS sender_type VARCHAR(10) DEFAULT 'bot'
+	`)
+	if err != nil {
+		log.Printf("⚠️ Warning: Could not add sender_type to warming_logs: %v", err)
+	} else {
+		log.Println("✅ sender_type field added to warming_logs (for AI context)")
+	}
+
+	// Add unique constraint for whitelisted_number in ACTIVE HUMAN_VS_BOT rooms
+	_, err = db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_human_room 
+		ON warming_rooms (whitelisted_number) 
+		WHERE status = 'ACTIVE' AND room_type = 'HUMAN_VS_BOT' AND whitelisted_number IS NOT NULL
+	`)
+	if err != nil {
+		log.Printf("⚠️ Warning: Could not create unique index for whitelisted_number: %v", err)
+	} else {
+		log.Println("✅ Unique constraint added: One whitelisted number per active HUMAN_VS_BOT room")
 	}
 
 	log.Println("schema created/ensured successfully (including warming system)")
