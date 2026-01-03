@@ -119,7 +119,7 @@ func GenerateReply(systemPrompt string, conversationHistory []ConversationMessag
 
 	// Add notification if response was truncated due to token limit
 	if candidate.FinishReason == "MAX_TOKENS" {
-		responseText += "\n\n_[Jawaban dipotong karena terlalu panjang. Silakan ajukan pertanyaan lebih spesifik untuk detail lebih lanjut.]_"
+		responseText += "\n\n_[Jawaban dipotong karena mencapai batas maksimal. Untuk jawaban lebih lengkap, silakan ajukan pertanyaan lebih spesifik atau hubungi admin untuk menaikkan batas token.]_"
 	}
 
 	// Log full response for debugging
