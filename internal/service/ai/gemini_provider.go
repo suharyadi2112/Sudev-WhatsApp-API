@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"gowa-yourself/config"
@@ -82,11 +83,42 @@ func GenerateReply(systemPrompt string, conversationHistory []ConversationMessag
 		return "", fmt.Errorf("Gemini SDK Error: %w", err)
 	}
 
-	// Extract and return result
-	responseText := result.Text()
+	// Extract and return result with detailed logging
+	if result == nil {
+		return "", fmt.Errorf("nil result from Gemini")
+	}
+
+	// Check if we have candidates
+	if len(result.Candidates) == 0 {
+		return "", fmt.Errorf("no candidates in Gemini response")
+	}
+
+	// Get first candidate
+	candidate := result.Candidates[0]
+	if candidate.Content == nil {
+		return "", fmt.Errorf("nil content in candidate")
+	}
+
+	// Log finish reason for debugging
+	if candidate.FinishReason != "" {
+		log.Printf("[AI DEBUG] Gemini FinishReason: %v", candidate.FinishReason)
+	}
+
+	// Extract text from parts
+	var textParts []string
+	for _, part := range candidate.Content.Parts {
+		if part.Text != "" {
+			textParts = append(textParts, part.Text)
+		}
+	}
+
+	responseText := strings.Join(textParts, " ")
 	if responseText == "" {
 		return "", fmt.Errorf("empty response from Gemini")
 	}
+
+	// Log full response for debugging
+	log.Printf("[AI DEBUG] Full response (%d chars): %s", len(responseText), responseText)
 
 	return strings.TrimSpace(responseText), nil
 }

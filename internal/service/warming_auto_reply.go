@@ -136,6 +136,8 @@ func getAIReply(room *warmingModel.WarmingRoom) (string, error) {
 		return "", fmt.Errorf("AI generation failed: %w", err)
 	}
 
+	log.Printf("[HUMAN_VS_BOT] AI generated reply (%d chars): %s", len(reply), reply)
+
 	return reply, nil
 }
 
