@@ -117,6 +117,11 @@ func GenerateReply(systemPrompt string, conversationHistory []ConversationMessag
 		return "", fmt.Errorf("empty response from Gemini")
 	}
 
+	// Add notification if response was truncated due to token limit
+	if candidate.FinishReason == "MAX_TOKENS" {
+		responseText += "\n\n_[Jawaban dipotong karena terlalu panjang. Silakan ajukan pertanyaan lebih spesifik untuk detail lebih lanjut.]_"
+	}
+
 	// Log full response for debugging
 	log.Printf("[AI DEBUG] Full response (%d chars): %s", len(responseText), responseText)
 
