@@ -339,7 +339,7 @@ func eventHandler(instanceID string) func(evt interface{}) {
 				}
 			}
 
-			if err := HandleIncomingMessage(instanceID, senderNumber, messageText); err != nil {
+			if err := HandleIncomingMessage(instanceID, senderNumber, messageText, v.Info.Chat, v.Info.ID, v.Info.Sender.String()); err != nil {
 				log.Printf("[HUMAN_VS_BOT] Error handling incoming message: %v", err)
 			}
 

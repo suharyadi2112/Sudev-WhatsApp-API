@@ -1,9 +1,11 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -12,13 +14,15 @@ import (
 	warmingModel "gowa-yourself/internal/model/warming"
 	"gowa-yourself/internal/service/ai"
 	"gowa-yourself/internal/ws"
+
+	"go.mau.fi/whatsmeow/types"
 )
 
 var (
 	lastReplyTime sync.Map // map[roomID]time.Time
 )
 
-func HandleIncomingMessage(instanceID, sender, messageText string) error {
+func HandleIncomingMessage(instanceID, sender, messageText string, chatJID types.JID, messageID, senderID string) error {
 	if !config.WarmingAutoReplyEnabled {
 		return nil
 	}
@@ -31,6 +35,26 @@ func HandleIncomingMessage(instanceID, sender, messageText string) error {
 
 	if room == nil {
 		return nil
+	}
+
+	// Mark message as read before processing (with natural delay)
+	session, err := GetSession(instanceID)
+	if err == nil && session.Client != nil {
+		// Random delay 2-3 seconds before marking as read (more natural)
+		readDelay := time.Duration(2+rand.Intn(2)) * time.Second
+		time.Sleep(readDelay)
+
+		senderJID, parseErr := types.ParseJID(senderID)
+		if parseErr != nil {
+			log.Printf("[HUMAN_VS_BOT] Warning: failed to parse sender JID: %v", parseErr)
+		} else {
+			err = session.Client.MarkRead(context.Background(), []types.MessageID{messageID}, time.Now(), chatJID, senderJID)
+			if err != nil {
+				log.Printf("[HUMAN_VS_BOT] Warning: failed to mark message as read: %v", err)
+			} else {
+				log.Printf("[HUMAN_VS_BOT] ✓ Marked message as read after %v delay", readDelay)
+			}
+		}
 	}
 
 	// Save incoming human message to conversation history
@@ -135,6 +159,8 @@ func getAIReply(room *warmingModel.WarmingRoom) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("AI generation failed: %w", err)
 	}
+
+	log.Printf("[HUMAN_VS_BOT] AI generated reply (%d chars): %s", len(reply), reply)
 
 	return reply, nil
 }
