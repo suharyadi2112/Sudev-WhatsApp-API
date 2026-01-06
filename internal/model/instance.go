@@ -184,7 +184,7 @@ func GetAllInstances() ([]Instance, error) {
 			used,
 			keterangan
         FROM instances
-        ORDER BY created_at DESC
+        ORDER BY used DESC, is_connected DESC, created_at DESC
     `
 
 	rows, err := database.AppDB.Query(query)
@@ -503,6 +503,7 @@ func ToResponse(inst Instance) InstanceResp {
 type UpdateInstanceFieldsRequest struct {
 	Used       *bool   `json:"used"`       // pointer to allow null (optional)
 	Keterangan *string `json:"keterangan"` // pointer to allow null (optional)
+	Circle     *string `json:"circle"`     // pointer to allow null (optional)
 }
 
 // UpdateInstanceFields updates used and keterangan fields
@@ -522,6 +523,12 @@ func UpdateInstanceFields(instanceID string, req *UpdateInstanceFieldsRequest) e
 	if req.Keterangan != nil {
 		updates = append(updates, fmt.Sprintf("keterangan = $%d", argCount))
 		args = append(args, *req.Keterangan)
+		argCount++
+	}
+
+	if req.Circle != nil {
+		updates = append(updates, fmt.Sprintf("circle = $%d", argCount))
+		args = append(args, *req.Circle)
 		argCount++
 	}
 

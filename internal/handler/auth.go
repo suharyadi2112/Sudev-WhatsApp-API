@@ -565,8 +565,8 @@ func UpdateInstanceFields(c echo.Context) error {
 	}
 
 	// Validate at least one field is provided
-	if req.Used == nil && req.Keterangan == nil {
-		return ErrorResponse(c, http.StatusBadRequest, "At least one field (used or keterangan) must be provided", "NO_FIELDS", "")
+	if req.Used == nil && req.Keterangan == nil && req.Circle == nil {
+		return ErrorResponse(c, http.StatusBadRequest, "At least one field (used, keterangan, or circle) must be provided", "NO_FIELDS", "")
 	}
 
 	err := model.UpdateInstanceFields(instanceID, &req)
