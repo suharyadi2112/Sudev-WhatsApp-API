@@ -55,13 +55,13 @@ WhatsApp API, WhatsApp Bot, Multi-instance WhatsApp, WhatsApp Automation, Go Wha
 
 ### API Reference
 
-```
+```bash
 https://soqnnmoe17.apidog.io/
 ```
 
 ### Global WebSocket - System Events
 
-```
+```bash
 ws://127.0.0.1:{port}/ws
 ```
 
@@ -75,7 +75,7 @@ ws://127.0.0.1:{port}/ws
 
 ### Instance-Specific WebSocket - Incoming Messages
 
-```
+```bash
 ws://localhost:2121/api/listen/:instanceId
 ```
 
@@ -83,13 +83,13 @@ ws://localhost:2121/api/listen/:instanceId
 
 **Headers:**
 
-```
+```http
 Authorization: Bearer {token}
 ```
 
 **Events received:**
 
-```
+```json
 {
   "event": "incoming_message",
   "timestamp": "2025-12-07T23:22:00Z",
@@ -181,28 +181,28 @@ For webhook security, SUDEVWA signs every outgoing webhook (when a secret is con
 - Message: raw HTTP request body (bytes)
 - Key: the instance-specific `webhook_secret`
 
-```
+```http
 POST /api/instances/:instanceId/webhook-setconfig
 Authorization: Bearer {token}
 Content-Type: application/json
 ```
 Example body:
-```
+```json
 {
-"url": "https://your-app.com/wa-webhook"
-"secret": "5513de0882c755985f4bb358e5cf027cb10e48a23a377cf77888e310b74aef21" //optional autogenerate if none
+"url": "https://your-app.com/wa-webhook",
+"secret": "5513de0882c755985f4bb358e5cf027cb10e48a23a377cf77888e310b74aef21"
 }
 ```
 Response : 
-```
+```json
 {
 "instanceId": "instance123",
 "webhookUrl": "https://your-app.com/wa-webhook",
 "secret": "5513de0882c755985f4bb358e5cf027cb10e48a23a377cf77888e310b74aef21"
 }
 ```
-Webhook Payload
-```
+Webhook Payload:
+```json
 {
 "event": "incoming_message",
 "timestamp": "2025-12-08T13:57:04.147255Z",
@@ -215,6 +215,7 @@ Webhook Payload
 "is_group": false,
 "message_id": "3EB0ABC123DEF456",
 "push_name": "John Doe"
+}
 }
 ```
 
