@@ -55,16 +55,6 @@ WhatsApp API, WhatsApp Bot, Multi-instance WhatsApp, WhatsApp Automation, Go Wha
 - **Presence heartbeat** — "Active now" status every 5 minutes
 - Real-time status tracking (`online`, `disconnected`, `logged_out`)
 
-## 📸 Screenshots / Gallery
-Here are some previews of the SUDEVWA interface.
-
-| Feature | Preview |
-| :--- | :--- |
-| **Login / Scan QR** | ![Login Screenshot](https://via.placeholder.com/800x450?text=Login+QR+Preview) |
-| **Instance Management** | ![Instances Screenshot](https://via.placeholder.com/800x450?text=Instances+Management+Preview) |
-| **Warming System (AI)** | ![Warming Screenshot](https://via.placeholder.com/800x450?text=Warming+System+Preview) |
-| **Message History** | ![Messages Screenshot](https://via.placeholder.com/800x450?text=Message+History+Preview) |
-
 ### API Reference
 
 ```bash
@@ -254,5 +244,15 @@ If you find this project useful, please consider:
 
 Your support helps maintain and improve this project!
 
-
 **Made by SUDEV**
+
+## 📸 Screenshots / Gallery
+Here are some previews of the SUDEVWA interface.
+
+| Feature | Preview |
+| :--- | :--- |
+| **Login / Scan QR** | ![Login Screenshot](https://via.placeholder.com/800x450?text=Login+QR+Preview) |
+| **Instance Management** | ![Instances Screenshot](https://via.placeholder.com/800x450?text=Instances+Management+Preview) |
+| **Warming System (AI)** | ![Warming Screenshot](https://via.placeholder.com/800x450?text=Warming+System+Preview) |
+| **Message History** | ![Messages Screenshot](https://via.placeholder.com/800x450?text=Message+History+Preview) |
+
