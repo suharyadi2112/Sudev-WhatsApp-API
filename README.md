@@ -251,9 +251,8 @@ Here are some previews of the SUDEVWA interface.
 
 | Feature | Preview |
 | :--- | :--- |
-| **Login / Scan QR** | ![Login Screenshot](<img width="1902" height="914" alt="image" src="https://github.com/user-attachments/assets/d1c5f823-5eb3-4a95-9dcd-4d58eb7629b6" />
-) |
-| **Instance Management** | ![Instances Screenshot](https://via.placeholder.com/800x450?text=Instances+Management+Preview) |
+| **Login / Scan QR** | <img width="1902" height="914" alt="image" src="https://github.com/user-attachments/assets/d1c5f823-5eb3-4a95-9dcd-4d58eb7629b6" /> |
+| **Instance Management** | <img width="1891" height="908" alt="image" src="https://github.com/user-attachments/assets/a0bb20ef-bdfa-4a5d-9f0b-c61fc5d7f8fe" />|
 | **Warming System (AI)** | ![Warming Screenshot](https://via.placeholder.com/800x450?text=Warming+System+Preview) |
 | **Message History** | ![Messages Screenshot](https://via.placeholder.com/800x450?text=Message+History+Preview) |
 
