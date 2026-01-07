@@ -115,9 +115,9 @@ Authorization: Bearer {token}
 
 Configure these variables in your `.env` file to customize the application behavior.
 
+### 🌐 Core Configuration
 | Variable | Description | Default | Example |
 | :--- | :--- | :--- | :--- |
-| **Core Configuration** | | | |
 | `DATABASE_URL` | PostgreSQL URL for whatsmeow session storage | - | `postgres://user:pass@localhost:5432/db` |
 | `APP_DATABASE_URL` | PostgreSQL URL for application data | - | `postgres://user:pass@localhost:5432/app_db` |
 | `JWT_SECRET` | Secret key for JWT authentication | - | `YOUR_JWT_SECRET` |
@@ -126,29 +126,44 @@ Configure these variables in your `.env` file to customize the application behav
 | `PORT` | Server listening port | `2121` | `3000` |
 | `BASEURL` | Base URL/Host of the server | - | `127.0.0.1` |
 | `CORS_ALLOW_ORIGINS` | Allowed origins for CORS | - | `http://localhost:3000` |
-| **Features & Logic** | | | |
+
+### 🛠️ Features & Logic
+| Variable | Description | Default | Example |
+| :--- | :--- | :--- | :--- |
 | `SUDEVWA_ENABLE_WEBSOCKET_INCOMING_MSG` | Enable incoming message WebSocket broadcast | `false` | `true` |
 | `SUDEVWA_ENABLE_WEBHOOK` | Enable global incoming message webhooks | `false` | `true` |
 | `SUDEVWA_TYPING_DELAY_MIN` | Minimum typing simulation delay (seconds) | `1` | `2` |
 | `SUDEVWA_TYPING_DELAY_MAX` | Maximum typing simulation delay (seconds) | `3` | `5` |
 | `ALLOW_9_DIGIT_PHONE_NUMBER` | Allow 9-digit numbers without validation | `false` | `true` |
-| **Rate Limiting** | | | |
+
+### 🚦 Rate Limiting
+| Variable | Description | Default | Example |
+| :--- | :--- | :--- | :--- |
 | `RATE_LIMIT_PER_SECOND` | API requests allowed per second | `10` | `20` |
 | `RATE_LIMIT_BURST` | Max burst of requests | `10` | `20` |
 | `RATE_LIMIT_WINDOW_MINUTES` | Rate limit expiration window | `3` | `5` |
-| **File Upload Limits (MB)** | | | |
+
+### 📁 File Upload Limits (MB)
+| Variable | Description | Default | Example |
+| :--- | :--- | :--- | :--- |
 | `MAX_FILE_SIZE_IMAGE_MB` | Max image upload size | `5` | `10` |
 | `MAX_FILE_SIZE_VIDEO_MB` | Max video upload size | `16` | `32` |
 | `MAX_FILE_SIZE_AUDIO_MB` | Max audio upload size | `16` | `32` |
 | `MAX_FILE_SIZE_DOCUMENT_MB` | Max document upload size | `100` | `200` |
-| **Warming System** | | | |
+
+### 🔥 Warming System
+| Variable | Description | Default | Example |
+| :--- | :--- | :--- | :--- |
 | `WARMING_WORKER_ENABLED` | Enable automated conversation simulation | `false` | `true` |
 | `WARMING_WORKER_INTERVAL_SECONDS` | Interval between worker checks | `5` | `10` |
 | `WARMING_AUTO_REPLY_ENABLED` | Enable AI/Auto-reply in warming rooms | `false` | `true` |
 | `WARMING_AUTO_REPLY_COOLDOWN` | Cooldown between auto-replies (seconds) | `60` | `10` |
 | `DEFAULT_REPLY_DELAY_MIN` | Min delay before auto-reply (seconds) | `10` | `5` |
 | `DEFAULT_REPLY_DELAY_MAX` | Max delay before auto-reply (seconds) | `60` | `30` |
-| **AI Configuration (Gemini)** | | | |
+
+### 🤖 AI Configuration (Gemini)
+| Variable | Description | Default | Example |
+| :--- | :--- | :--- | :--- |
 | `AI_ENABLED` | Enable AI-powered features | `false` | `true` |
 | `AI_DEFAULT_PROVIDER` | AI provider (gemini or openai) | `gemini` | `openai` |
 | `GEMINI_API_KEY` | Google Gemini API Key | - | `AIzaSy...` |
