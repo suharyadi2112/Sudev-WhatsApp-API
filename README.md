@@ -261,18 +261,7 @@ Here are some previews of the SUDEVWA interface.
 | **Disconnect Instances** | <img width="981" height="468" alt="image" src="https://github.com/user-attachments/assets/ea3e6db2-074c-4417-a713-2d0b438a7437" />|
 | **Message Room** | <img width="1881" height="849" alt="image" src="https://github.com/user-attachments/assets/d01bd6ed-1558-4629-951d-b4b5032d46f5" />|
 | **Message Room Group** | <img width="1884" height="876" alt="image" src="https://github.com/user-attachments/assets/6d795feb-5fd2-40c6-9e98-e55f3ee72896" />|
-| **Warming Room** | <img width="1875" height="879" alt="image" src="https://github.com/user-attachments/assets/d09b638a-d1c1-4eac-81d7-91f206543fe0" />|
-| **Add Instances** | <img width="1879" height="903" alt="image" src="https://github.com/user-attachments/assets/8ea6a200-0281-4ff4-8ea3-9f8fe3f89a59" />|
-| **Add Instances** | <img width="1879" height="903" alt="image" src="https://github.com/user-attachments/assets/8ea6a200-0281-4ff4-8ea3-9f8fe3f89a59" />|
-| **Add Instances** | <img width="1879" height="903" alt="image" src="https://github.com/user-attachments/assets/8ea6a200-0281-4ff4-8ea3-9f8fe3f89a59" />|
-| **Add Instances** | <img width="1879" height="903" alt="image" src="https://github.com/user-attachments/assets/8ea6a200-0281-4ff4-8ea3-9f8fe3f89a59" />|
-| **Add Instances** | <img width="1879" height="903" alt="image" src="https://github.com/user-attachments/assets/8ea6a200-0281-4ff4-8ea3-9f8fe3f89a59" />|
-| **Add Instances** | <img width="1879" height="903" alt="image" src="https://github.com/user-attachments/assets/8ea6a200-0281-4ff4-8ea3-9f8fe3f89a59" />|
-| **Add Instances** | <img width="1879" height="903" alt="image" src="https://github.com/user-attachments/assets/8ea6a200-0281-4ff4-8ea3-9f8fe3f89a59" />|
-| **Add Instances** | <img width="1879" height="903" alt="image" src="https://github.com/user-attachments/assets/8ea6a200-0281-4ff4-8ea3-9f8fe3f89a59" />|
-| **Add Instances** | <img width="1879" height="903" alt="image" src="https://github.com/user-attachments/assets/8ea6a200-0281-4ff4-8ea3-9f8fe3f89a59" />|
-| **Add Instances** | <img width="1879" height="903" alt="image" src="https://github.com/user-attachments/assets/8ea6a200-0281-4ff4-8ea3-9f8fe3f89a59" />|
-| **Add Instances** | <img width="1879" height="903" alt="image" src="https://github.com/user-attachments/assets/8ea6a200-0281-4ff4-8ea3-9f8fe3f89a59" />|
-| **Add Instances** | <img width="1879" height="903" alt="image" src="https://github.com/user-attachments/assets/8ea6a200-0281-4ff4-8ea3-9f8fe3f89a59" />|
-| **Message History** | ![Messages Screenshot](https://via.placeholder.com/800x450?text=Message+History+Preview) |
+| **Add Warming Room** | <img width="1446" height="812" alt="image" src="https://github.com/user-attachments/assets/8a05d3a4-be9a-490d-844d-27b6a89ebfb1" />|
+| **Number Checker** | <img width="1878" height="770" alt="image" src="https://github.com/user-attachments/assets/19b6eda2-dd89-4244-b1df-90dfc5d95bea" />|
+| **Api Documentation** | <img width="1863" height="867" alt="image" src="https://github.com/user-attachments/assets/689b81a2-907e-4282-b74f-7ac12aa8eeb4" />|
 
