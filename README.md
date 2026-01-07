@@ -253,7 +253,7 @@ Here are some previews of the SUDEVWA interface.
 | :--- | :--- |
 | **Login / Scan QR** | <img width="1902" height="914" alt="image" src="https://github.com/user-attachments/assets/d1c5f823-5eb3-4a95-9dcd-4d58eb7629b6" /> |
 | **Main Dashboard** | <img width="1891" height="908" alt="image" src="https://github.com/user-attachments/assets/a0bb20ef-bdfa-4a5d-9f0b-c61fc5d7f8fe" />|
-| **Instances Management** | <img width="1893" height="908" alt="image" src="https://github.com/user-attachments/assets/eaa106b9-1d3f-4f2c-aeef-a1bf8543ff0e" />|
+| **Instances Management** | <img width="1881" height="825" alt="image" src="https://github.com/user-attachments/assets/4ec19e75-1782-4a8a-b0aa-aa52f29dceef" />|
 | **Add Instances** | <img width="955" height="487" alt="image" src="https://github.com/user-attachments/assets/ecfafa8c-26af-444a-aed0-948f14ab84ec" />|
 | **Detail Instances** | <img width="658" height="707" alt="image" src="https://github.com/user-attachments/assets/3ef0056d-9f59-494c-b340-aaff98f20551" />|
 | **Edit Instances** | <img width="537" height="768" alt="image" src="https://github.com/user-attachments/assets/0658a838-e3e6-4983-95de-cfed90838d17" />|
