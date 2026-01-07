@@ -28,16 +28,18 @@ WhatsApp API, WhatsApp Bot, Multi-instance WhatsApp, WhatsApp Automation, Go Wha
 - **Real-time incoming message listener** — listen to incoming messages via WebSocket per instance
 
 ### 🤖 WhatsApp Warming System
-- **Automated conversation simulation** — warm up WhatsApp accounts with natural dialog
-- **Script-based messaging** — create reusable conversation templates with spintax support
-- **Bidirectional communication** — Actor A ↔ Actor B automatic message exchange
-- **Simulation mode** — test scripts without sending real messages (dry-run)
-- **Real message mode** — send actual WhatsApp messages with typing simulation
-- **Auto-pause on errors** — automatically pause rooms when instances disconnect
-- **Dynamic variables** — `{TIME_GREETING}`, `{DAY_NAME}`, `{DATE}` for contextual messages
-- **Interval control** — randomized delays between messages (min/max seconds)
-- **Real-time monitoring** — WebSocket events for message status and script progress
-- **Drag-and-drop reordering** — easily rearrange script line sequences
+- **Two Simulation Modes**:
+    - **Human vs Bot (AI Mode)** — Automated natural interaction using **Google Gemini AI** to simulate real human conversations.
+    - **Script Mode** — Execute pre-defined conversation scripts with **Spintax support** for variety.
+- **Automated Conversation Simulation** — Warm up WhatsApp accounts with natural dialog.
+- **Bidirectional Communication** — Actor A ↔ Actor B automatic message exchange.
+- **Simulation mode** — Test scripts without sending real messages (dry-run).
+- **Real message mode** — Send actual WhatsApp messages with typing simulation.
+- **Auto-pause on errors** — Automatically pause rooms when instances disconnect.
+- **Dynamic variables** — `{TIME_GREETING}`, `{DAY_NAME}`, `{DATE}` for contextual messages.
+- **Interval control** — Randomized delays between messages (min/max seconds).
+- **Real-time monitoring** — WebSocket events for message status and script progress.
+- **Drag-and-drop reordering** — Easily rearrange script line sequences.
 
 ### 🔌 Real-time Features (WebSocket)
 - **Global WebSocket** (`/ws`) — monitor QR events, status changes, system events for all instances
@@ -53,10 +55,20 @@ WhatsApp API, WhatsApp Bot, Multi-instance WhatsApp, WhatsApp Automation, Go Wha
 - **Presence heartbeat** — "Active now" status every 5 minutes
 - Real-time status tracking (`online`, `disconnected`, `logged_out`)
 
+## 📸 Screenshots / Gallery
+Here are some previews of the SUDEVWA interface.
+
+| Feature | Preview |
+| :--- | :--- |
+| **Login / Scan QR** | ![Login Screenshot](https://via.placeholder.com/800x450?text=Login+QR+Preview) |
+| **Instance Management** | ![Instances Screenshot](https://via.placeholder.com/800x450?text=Instances+Management+Preview) |
+| **Warming System (AI)** | ![Warming Screenshot](https://via.placeholder.com/800x450?text=Warming+System+Preview) |
+| **Message History** | ![Messages Screenshot](https://via.placeholder.com/800x450?text=Message+History+Preview) |
+
 ### API Reference
 
 ```bash
-https://soqnnmoe17.apidog.io/
+https://sudevwa.apidog.io/
 ```
 
 ### Global WebSocket - System Events
