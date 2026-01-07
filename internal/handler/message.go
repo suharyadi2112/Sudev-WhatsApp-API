@@ -346,3 +346,62 @@ func getValidationNote(isRegistered, willSkip bool) string {
 	}
 	return "Number is not registered. Message sending will be blocked unless ALLOW_9_DIGIT_PHONE_NUMBER=true is set"
 }
+
+// GET /contacts/:instanceId
+func GetContactList(c echo.Context) error {
+	instanceID := c.Param("instanceId")
+
+	session, err := service.GetSession(instanceID)
+	if err != nil {
+		return ErrorResponse(c, 404, "Session not found", "SESSION_NOT_FOUND", "Please login first")
+	}
+
+	if !session.IsConnected {
+		return ErrorResponse(c, 400, "Session is not connected", "NOT_CONNECTED", "Please check /status endpoint")
+	}
+
+	if !session.Client.IsConnected() {
+		return ErrorResponse(c, 400, "WhatsApp connection lost", "CONNECTION_LOST", "Please reconnect")
+	}
+
+	if session.Client.Store.ID == nil {
+		return ErrorResponse(c, 400, "Not logged in", "NOT_LOGGED_IN", "Please scan QR code first")
+	}
+
+	contacts, err := session.Client.Store.Contacts.GetAllContacts(context.Background())
+	if err != nil {
+		return ErrorResponse(c, 500, "Failed to retrieve contact list", "FETCH_FAILED", err.Error())
+	}
+
+	type ContactInfo struct {
+		JID     string `json:"jid"`
+		Name    string `json:"name"`
+		IsGroup bool   `json:"isGroup"`
+	}
+
+	contactList := make([]ContactInfo, 0, len(contacts))
+	for jid, contact := range contacts {
+		contactInfo := ContactInfo{
+			JID:     jid.String(),
+			Name:    contact.FullName,
+			IsGroup: jid.Server == "g.us",
+		}
+
+		if contactInfo.Name == "" {
+			if contact.BusinessName != "" {
+				contactInfo.Name = contact.BusinessName
+			} else if contact.PushName != "" {
+				contactInfo.Name = contact.PushName
+			} else {
+				contactInfo.Name = jid.User
+			}
+		}
+
+		contactList = append(contactList, contactInfo)
+	}
+
+	return SuccessResponse(c, 200, "Contact list retrieved successfully", map[string]interface{}{
+		"total":    len(contactList),
+		"contacts": contactList,
+	})
+}
