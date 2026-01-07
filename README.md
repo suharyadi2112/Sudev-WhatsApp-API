@@ -111,14 +111,51 @@ Authorization: Bearer {token}
 - Configurable per instance via REST API  
 - Shared payload format with WebSocket `incoming_message` event  
 
-### Enable via ENV
-```
-SUDEVWA_ENABLE_WEBSOCKET_INCOMING_MSG=false //for incoming message only
-SUDEVWA_ENABLE_WEBHOOK=false //for webhook only
-WARMING_WORKER_ENABLED=false //for warming worker (bot)
-SUDEVWA_TYPING_DELAY_MIN=1 //for typing delay min
-SUDEVWA_TYPING_DELAY_MAX=3 //for typing delay max
-```
+## ⚙️ Environment Variables
+
+Configure these variables in your `.env` file to customize the application behavior.
+
+| Variable | Description | Default | Example |
+| :--- | :--- | :--- | :--- |
+| **Core Configuration** | | | |
+| `DATABASE_URL` | PostgreSQL URL for whatsmeow session storage | - | `postgres://user:pass@localhost:5432/db` |
+| `APP_DATABASE_URL` | PostgreSQL URL for application data | - | `postgres://user:pass@localhost:5432/app_db` |
+| `JWT_SECRET` | Secret key for JWT authentication | - | `YOUR_JWT_SECRET` |
+| `APP_LOGIN_USERNAME` | Username for dashboard/API login | - | `sudevwa` |
+| `APP_LOGIN_PASSWORD` | Password for dashboard/API login | - | `5ud3vw4` |
+| `PORT` | Server listening port | `2121` | `3000` |
+| `BASEURL` | Base URL/Host of the server | - | `127.0.0.1` |
+| `CORS_ALLOW_ORIGINS` | Allowed origins for CORS | - | `http://localhost:3000` |
+| **Features & Logic** | | | |
+| `SUDEVWA_ENABLE_WEBSOCKET_INCOMING_MSG` | Enable incoming message WebSocket broadcast | `false` | `true` |
+| `SUDEVWA_ENABLE_WEBHOOK` | Enable global incoming message webhooks | `false` | `true` |
+| `SUDEVWA_TYPING_DELAY_MIN` | Minimum typing simulation delay (seconds) | `1` | `2` |
+| `SUDEVWA_TYPING_DELAY_MAX` | Maximum typing simulation delay (seconds) | `3` | `5` |
+| `ALLOW_9_DIGIT_PHONE_NUMBER` | Allow 9-digit numbers without validation | `false` | `true` |
+| **Rate Limiting** | | | |
+| `RATE_LIMIT_PER_SECOND` | API requests allowed per second | `10` | `20` |
+| `RATE_LIMIT_BURST` | Max burst of requests | `10` | `20` |
+| `RATE_LIMIT_WINDOW_MINUTES` | Rate limit expiration window | `3` | `5` |
+| **File Upload Limits (MB)** | | | |
+| `MAX_FILE_SIZE_IMAGE_MB` | Max image upload size | `5` | `10` |
+| `MAX_FILE_SIZE_VIDEO_MB` | Max video upload size | `16` | `32` |
+| `MAX_FILE_SIZE_AUDIO_MB` | Max audio upload size | `16` | `32` |
+| `MAX_FILE_SIZE_DOCUMENT_MB` | Max document upload size | `100` | `200` |
+| **Warming System** | | | |
+| `WARMING_WORKER_ENABLED` | Enable automated conversation simulation | `false` | `true` |
+| `WARMING_WORKER_INTERVAL_SECONDS` | Interval between worker checks | `5` | `10` |
+| `WARMING_AUTO_REPLY_ENABLED` | Enable AI/Auto-reply in warming rooms | `false` | `true` |
+| `WARMING_AUTO_REPLY_COOLDOWN` | Cooldown between auto-replies (seconds) | `60` | `10` |
+| `DEFAULT_REPLY_DELAY_MIN` | Min delay before auto-reply (seconds) | `10` | `5` |
+| `DEFAULT_REPLY_DELAY_MAX` | Max delay before auto-reply (seconds) | `60` | `30` |
+| **AI Configuration (Gemini)** | | | |
+| `AI_ENABLED` | Enable AI-powered features | `false` | `true` |
+| `AI_DEFAULT_PROVIDER` | AI provider (gemini or openai) | `gemini` | `openai` |
+| `GEMINI_API_KEY` | Google Gemini API Key | - | `AIzaSy...` |
+| `GEMINI_DEFAULT_MODEL` | Default Gemini model to use | `gemini-1.5-flash` | `gemini-pro` |
+| `AI_CONVERSATION_HISTORY_LIMIT` | Number of previous messages for context | `10` | `20` |
+| `AI_DEFAULT_TEMPERATURE` | AI response randomness (0.0 to 1.0) | `0.7` | `0.5` |
+| `AI_DEFAULT_MAX_TOKENS` | Max tokens for AI response | `150` | `300` |
 If this variable is not set, or set to anything other than `true`, webhooks will not be sent.
 
 ### Configure Webhook per Instance
