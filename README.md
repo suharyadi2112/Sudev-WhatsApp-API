@@ -258,7 +258,7 @@ Here are some previews of the SUDEVWA interface.
 | **Detail Instances** | <img width="658" height="707" alt="image" src="https://github.com/user-attachments/assets/3ef0056d-9f59-494c-b340-aaff98f20551" />|
 | **Edit Instances** | <img width="537" height="768" alt="image" src="https://github.com/user-attachments/assets/0658a838-e3e6-4983-95de-cfed90838d17" />|
 | **QR Code Instances** | <img width="1301" height="511" alt="image" src="https://github.com/user-attachments/assets/61eb147b-c99d-45c2-b1d9-1cf58d91581c" />|
-| **Disconnect Instances** | <img width="981" height="468" alt="image" src="https://github.com/user-attachments/assets/ea3e6db2-074c-4417-a713-2d0b438a7437" />|
+| **Disconnect Instances** | <img width="862" height="458" alt="image" src="https://github.com/user-attachments/assets/3a6bd749-a801-41da-9ce7-41d8a664ccdc" />|
 | **Message Room** | <img width="1881" height="849" alt="image" src="https://github.com/user-attachments/assets/d01bd6ed-1558-4629-951d-b4b5032d46f5" />|
 | **Message Room Group** | <img width="1884" height="876" alt="image" src="https://github.com/user-attachments/assets/6d795feb-5fd2-40c6-9e98-e55f3ee72896" />|
 | **Add Warming Room** | <img width="1446" height="812" alt="image" src="https://github.com/user-attachments/assets/8a05d3a4-be9a-490d-844d-27b6a89ebfb1" />|
