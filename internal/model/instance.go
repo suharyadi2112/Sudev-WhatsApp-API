@@ -184,7 +184,12 @@ func GetAllInstances() ([]Instance, error) {
 			used,
 			keterangan
         FROM instances
-        ORDER BY used DESC, is_connected DESC, created_at DESC
+        ORDER BY 
+            CASE WHEN circle = 'one' THEN 0 ELSE 1 END,
+            circle ASC,
+            used DESC, 
+            is_connected DESC, 
+            created_at DESC
     `
 
 	rows, err := database.AppDB.Query(query)
