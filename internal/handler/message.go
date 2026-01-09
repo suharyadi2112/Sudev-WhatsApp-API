@@ -368,6 +368,7 @@ func GetContactList(c echo.Context) error {
 		return ErrorResponse(c, 400, "Not logged in", "NOT_LOGGED_IN", "Please scan QR code first")
 	}
 
+	// Parse pagination params (default: page=1, limit=50, max=100)
 	page := 1
 	limit := 50
 
@@ -394,6 +395,7 @@ func GetContactList(c echo.Context) error {
 		IsGroup bool   `json:"isGroup"`
 	}
 
+	// Build contact list with name fallback
 	allContacts := make([]ContactInfo, 0, len(contacts))
 	for jid, contact := range contacts {
 		contactInfo := ContactInfo{
@@ -415,12 +417,14 @@ func GetContactList(c echo.Context) error {
 		allContacts = append(allContacts, contactInfo)
 	}
 
+	// Calculate pagination
 	totalContacts := len(allContacts)
 	totalPages := (totalContacts + limit - 1) / limit
 
 	startIndex := (page - 1) * limit
 	endIndex := startIndex + limit
 
+	// Handle out of range page
 	if startIndex >= totalContacts {
 		return SuccessResponse(c, 200, "Contact list retrieved successfully", map[string]interface{}{
 			"total":       totalContacts,
