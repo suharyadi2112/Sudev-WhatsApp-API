@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"gowa-yourself/internal/helper"
@@ -347,7 +348,7 @@ func getValidationNote(isRegistered, willSkip bool) string {
 	return "Number is not registered. Message sending will be blocked unless ALLOW_9_DIGIT_PHONE_NUMBER=true is set"
 }
 
-// GET /contacts/:instanceId?page=1&limit=50
+// GET /contacts/:instanceId?page=1&limit=50&search=john
 func GetContactList(c echo.Context) error {
 	instanceID := c.Param("instanceId")
 
@@ -371,6 +372,7 @@ func GetContactList(c echo.Context) error {
 	// Parse pagination params (default: page=1, limit=50, max=100)
 	page := 1
 	limit := 50
+	searchQuery := strings.ToLower(strings.TrimSpace(c.QueryParam("search")))
 
 	if pageStr := c.QueryParam("page"); pageStr != "" {
 		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
@@ -414,6 +416,15 @@ func GetContactList(c echo.Context) error {
 			}
 		}
 
+		// Filter by search query (case-insensitive)
+		if searchQuery != "" {
+			nameMatch := strings.Contains(strings.ToLower(contactInfo.Name), searchQuery)
+			jidMatch := strings.Contains(strings.ToLower(contactInfo.JID), searchQuery)
+			if !nameMatch && !jidMatch {
+				continue
+			}
+		}
+
 		allContacts = append(allContacts, contactInfo)
 	}
 
@@ -431,6 +442,7 @@ func GetContactList(c echo.Context) error {
 			"page":        page,
 			"limit":       limit,
 			"totalPages":  totalPages,
+			"search":      searchQuery,
 			"contacts":    []ContactInfo{},
 			"hasNextPage": false,
 			"hasPrevPage": page > 1,
@@ -448,6 +460,7 @@ func GetContactList(c echo.Context) error {
 		"page":        page,
 		"limit":       limit,
 		"totalPages":  totalPages,
+		"search":      searchQuery,
 		"contacts":    paginatedContacts,
 		"hasNextPage": page < totalPages,
 		"hasPrevPage": page > 1,
