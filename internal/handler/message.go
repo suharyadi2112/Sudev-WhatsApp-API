@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"gowa-yourself/internal/helper"
@@ -345,4 +346,123 @@ func getValidationNote(isRegistered, willSkip bool) string {
 		return "Number is registered and will pass validation when sending"
 	}
 	return "Number is not registered. Message sending will be blocked unless ALLOW_9_DIGIT_PHONE_NUMBER=true is set"
+}
+
+// GET /contacts/:instanceId?page=1&limit=50&search=john
+func GetContactList(c echo.Context) error {
+	instanceID := c.Param("instanceId")
+
+	session, err := service.GetSession(instanceID)
+	if err != nil {
+		return ErrorResponse(c, 404, "Session not found", "SESSION_NOT_FOUND", "Please login first")
+	}
+
+	if !session.IsConnected {
+		return ErrorResponse(c, 400, "Session is not connected", "NOT_CONNECTED", "Please check /status endpoint")
+	}
+
+	if !session.Client.IsConnected() {
+		return ErrorResponse(c, 400, "WhatsApp connection lost", "CONNECTION_LOST", "Please reconnect")
+	}
+
+	if session.Client.Store.ID == nil {
+		return ErrorResponse(c, 400, "Not logged in", "NOT_LOGGED_IN", "Please scan QR code first")
+	}
+
+	// Parse pagination params (default: page=1, limit=50, max=100)
+	page := 1
+	limit := 50
+	searchQuery := strings.ToLower(strings.TrimSpace(c.QueryParam("search")))
+
+	if pageStr := c.QueryParam("page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	if limitStr := c.QueryParam("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+
+	contacts, err := session.Client.Store.Contacts.GetAllContacts(context.Background())
+	if err != nil {
+		return ErrorResponse(c, 500, "Failed to retrieve contact list", "FETCH_FAILED", err.Error())
+	}
+
+	type ContactInfo struct {
+		JID     string `json:"jid"`
+		Name    string `json:"name"`
+		IsGroup bool   `json:"isGroup"`
+	}
+
+	// Build contact list with name fallback
+	allContacts := make([]ContactInfo, 0, len(contacts))
+	for jid, contact := range contacts {
+		contactInfo := ContactInfo{
+			JID:     jid.String(),
+			Name:    contact.FullName,
+			IsGroup: jid.Server == "g.us",
+		}
+
+		if contactInfo.Name == "" {
+			if contact.BusinessName != "" {
+				contactInfo.Name = contact.BusinessName
+			} else if contact.PushName != "" {
+				contactInfo.Name = contact.PushName
+			} else {
+				contactInfo.Name = jid.User
+			}
+		}
+
+		// Filter by search query (case-insensitive)
+		if searchQuery != "" {
+			nameMatch := strings.Contains(strings.ToLower(contactInfo.Name), searchQuery)
+			jidMatch := strings.Contains(strings.ToLower(contactInfo.JID), searchQuery)
+			if !nameMatch && !jidMatch {
+				continue
+			}
+		}
+
+		allContacts = append(allContacts, contactInfo)
+	}
+
+	// Calculate pagination
+	totalContacts := len(allContacts)
+	totalPages := (totalContacts + limit - 1) / limit
+
+	startIndex := (page - 1) * limit
+	endIndex := startIndex + limit
+
+	// Handle out of range page
+	if startIndex >= totalContacts {
+		return SuccessResponse(c, 200, "Contact list retrieved successfully", map[string]interface{}{
+			"total":       totalContacts,
+			"page":        page,
+			"limit":       limit,
+			"totalPages":  totalPages,
+			"search":      searchQuery,
+			"contacts":    []ContactInfo{},
+			"hasNextPage": false,
+			"hasPrevPage": page > 1,
+		})
+	}
+
+	if endIndex > totalContacts {
+		endIndex = totalContacts
+	}
+
+	paginatedContacts := allContacts[startIndex:endIndex]
+
+	return SuccessResponse(c, 200, "Contact list retrieved successfully", map[string]interface{}{
+		"total":       totalContacts,
+		"page":        page,
+		"limit":       limit,
+		"totalPages":  totalPages,
+		"search":      searchQuery,
+		"contacts":    paginatedContacts,
+		"hasNextPage": page < totalPages,
+		"hasPrevPage": page > 1,
+	})
 }
