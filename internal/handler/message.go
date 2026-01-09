@@ -347,7 +347,7 @@ func getValidationNote(isRegistered, willSkip bool) string {
 	return "Number is not registered. Message sending will be blocked unless ALLOW_9_DIGIT_PHONE_NUMBER=true is set"
 }
 
-// GET /contacts/:instanceId
+// GET /contacts/:instanceId?page=1&limit=50
 func GetContactList(c echo.Context) error {
 	instanceID := c.Param("instanceId")
 
@@ -368,6 +368,21 @@ func GetContactList(c echo.Context) error {
 		return ErrorResponse(c, 400, "Not logged in", "NOT_LOGGED_IN", "Please scan QR code first")
 	}
 
+	page := 1
+	limit := 50
+
+	if pageStr := c.QueryParam("page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	if limitStr := c.QueryParam("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+
 	contacts, err := session.Client.Store.Contacts.GetAllContacts(context.Background())
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to retrieve contact list", "FETCH_FAILED", err.Error())
@@ -379,7 +394,7 @@ func GetContactList(c echo.Context) error {
 		IsGroup bool   `json:"isGroup"`
 	}
 
-	contactList := make([]ContactInfo, 0, len(contacts))
+	allContacts := make([]ContactInfo, 0, len(contacts))
 	for jid, contact := range contacts {
 		contactInfo := ContactInfo{
 			JID:     jid.String(),
@@ -397,11 +412,40 @@ func GetContactList(c echo.Context) error {
 			}
 		}
 
-		contactList = append(contactList, contactInfo)
+		allContacts = append(allContacts, contactInfo)
 	}
 
+	totalContacts := len(allContacts)
+	totalPages := (totalContacts + limit - 1) / limit
+
+	startIndex := (page - 1) * limit
+	endIndex := startIndex + limit
+
+	if startIndex >= totalContacts {
+		return SuccessResponse(c, 200, "Contact list retrieved successfully", map[string]interface{}{
+			"total":       totalContacts,
+			"page":        page,
+			"limit":       limit,
+			"totalPages":  totalPages,
+			"contacts":    []ContactInfo{},
+			"hasNextPage": false,
+			"hasPrevPage": page > 1,
+		})
+	}
+
+	if endIndex > totalContacts {
+		endIndex = totalContacts
+	}
+
+	paginatedContacts := allContacts[startIndex:endIndex]
+
 	return SuccessResponse(c, 200, "Contact list retrieved successfully", map[string]interface{}{
-		"total":    len(contactList),
-		"contacts": contactList,
+		"total":       totalContacts,
+		"page":        page,
+		"limit":       limit,
+		"totalPages":  totalPages,
+		"contacts":    paginatedContacts,
+		"hasNextPage": page < totalPages,
+		"hasPrevPage": page > 1,
 	})
 }
