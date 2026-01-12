@@ -392,18 +392,27 @@ func GetContactList(c echo.Context) error {
 	}
 
 	type ContactInfo struct {
-		JID     string `json:"jid"`
-		Name    string `json:"name"`
-		IsGroup bool   `json:"isGroup"`
+		JID         string `json:"jid"`
+		PhoneNumber string `json:"phoneNumber"`
+		Name        string `json:"name"`
+		IsGroup     bool   `json:"isGroup"`
+		IsLID       bool   `json:"isLID"`
 	}
 
-	// Build contact list with name fallback
-	allContacts := make([]ContactInfo, 0, len(contacts))
+	// Build contact list with name fallback and LID resolution
+	contactMap := make(map[string]ContactInfo)
 	for jid, contact := range contacts {
 		contactInfo := ContactInfo{
-			JID:     jid.String(),
-			Name:    contact.FullName,
-			IsGroup: jid.Server == "g.us",
+			JID:         jid.String(),
+			PhoneNumber: jid.User,
+			Name:        contact.FullName,
+			IsGroup:     jid.Server == "g.us",
+			IsLID:       jid.Server == "lid",
+		}
+
+		// Skip all LID contacts (linked devices)
+		if jid.Server == "lid" {
+			continue
 		}
 
 		if contactInfo.Name == "" {
@@ -412,15 +421,35 @@ func GetContactList(c echo.Context) error {
 			} else if contact.PushName != "" {
 				contactInfo.Name = contact.PushName
 			} else {
-				contactInfo.Name = jid.User
+				contactInfo.Name = contactInfo.PhoneNumber
 			}
 		}
 
+		// Deduplicate: group by phone number, prefer @s.whatsapp.net over @lid
+		key := contactInfo.PhoneNumber
+		if existing, exists := contactMap[key]; exists {
+			// Keep @s.whatsapp.net over @lid
+			if existing.IsLID && !contactInfo.IsLID {
+				contactMap[key] = contactInfo
+			}
+			// If both are same type, keep the one with better name
+			if existing.IsLID == contactInfo.IsLID && contactInfo.Name != contactInfo.PhoneNumber {
+				contactMap[key] = contactInfo
+			}
+		} else {
+			contactMap[key] = contactInfo
+		}
+	}
+
+	// Convert map to slice
+	allContacts := make([]ContactInfo, 0, len(contactMap))
+	for _, contactInfo := range contactMap {
 		// Filter by search query (case-insensitive)
 		if searchQuery != "" {
 			nameMatch := strings.Contains(strings.ToLower(contactInfo.Name), searchQuery)
 			jidMatch := strings.Contains(strings.ToLower(contactInfo.JID), searchQuery)
-			if !nameMatch && !jidMatch {
+			phoneMatch := strings.Contains(strings.ToLower(contactInfo.PhoneNumber), searchQuery)
+			if !nameMatch && !jidMatch && !phoneMatch {
 				continue
 			}
 		}
