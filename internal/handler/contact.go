@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/service"
@@ -14,6 +17,12 @@ import (
 	"github.com/xuri/excelize/v2"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types"
+)
+
+var (
+	// Track mutual groups processing per instance with contact info
+	mutualGroupsProcessing     = make(map[string]map[string]string) // instanceID -> {"jid": "...", "name": "..."}
+	mutualGroupsProcessingLock sync.Mutex
 )
 
 // ContactInfo represents contact information for list and export
@@ -166,15 +175,142 @@ func GetContactDetail(c echo.Context) error {
 				contactDetail["about"] = info.Status
 			}
 
-			// Business info
+			// Verified business info
 			if info.VerifiedName != nil && info.VerifiedName.Details.GetVerifiedName() != "" {
-				contactDetail["isBusiness"] = true
 				contactDetail["verifiedName"] = info.VerifiedName.Details.GetVerifiedName()
 			}
 		}
 	}
 
 	return SuccessResponse(c, 200, "Contact details retrieved successfully", contactDetail)
+}
+
+// GET /contacts/:instanceId/:jid/mutual-groups
+func GetMutualGroups(c echo.Context) error {
+	instanceID := c.Param("instanceId")
+	jidParam := c.Param("jid")
+
+	session, err := service.GetSession(instanceID)
+	if err != nil {
+		return ErrorResponse(c, 404, "Session not found", "SESSION_NOT_FOUND", "Please login first")
+	}
+
+	if !session.IsConnected {
+		return ErrorResponse(c, 400, "Session is not connected", "NOT_CONNECTED", "Please check /status endpoint")
+	}
+
+	if !session.Client.IsConnected() {
+		return ErrorResponse(c, 400, "WhatsApp connection lost", "CONNECTION_LOST", "Please reconnect")
+	}
+
+	if session.Client.Store.ID == nil {
+		return ErrorResponse(c, 400, "Not logged in", "NOT_LOGGED_IN", "Please scan QR code first")
+	}
+
+	// Parse JID
+	jid, err := types.ParseJID(jidParam)
+	if err != nil {
+		return ErrorResponse(c, 400, "Invalid JID format", "INVALID_JID", err.Error())
+	}
+
+	// Get contact name for better error message
+	contact, _ := session.Client.Store.Contacts.GetContact(context.Background(), jid)
+	contactName := contact.FullName
+	if contactName == "" {
+		if contact.BusinessName != "" {
+			contactName = contact.BusinessName
+		} else if contact.PushName != "" {
+			contactName = contact.PushName
+		} else {
+			contactName = jid.User
+		}
+	}
+
+	// Check if mutual groups is already being processed for this instance
+	mutualGroupsProcessingLock.Lock()
+	if processingInfo, exists := mutualGroupsProcessing[instanceID]; exists {
+		mutualGroupsProcessingLock.Unlock()
+		return ErrorResponse(c, 409, "Mutual groups check already in progress", "ALREADY_PROCESSING",
+			fmt.Sprintf("Currently checking mutual groups for: %s (%s). Please wait for it to complete.",
+				processingInfo["name"], processingInfo["jid"]))
+	}
+	// Mark as processing with contact info
+	mutualGroupsProcessing[instanceID] = map[string]string{
+		"jid":  jid.String(),
+		"name": contactName,
+	}
+	mutualGroupsProcessingLock.Unlock()
+
+	// Ensure we unlock when done (defer)
+	defer func() {
+		mutualGroupsProcessingLock.Lock()
+		delete(mutualGroupsProcessing, instanceID)
+		mutualGroupsProcessingLock.Unlock()
+		log.Printf("🔓 [Mutual Groups] Released lock for instance: %s", instanceID)
+	}()
+
+	log.Printf("🔒 [Mutual Groups] Acquired lock for instance: %s (checking: %s)", instanceID, contactName)
+
+	// Skip if it's a group
+	if jid.Server == "g.us" {
+		return SuccessResponse(c, 200, "Mutual groups retrieved successfully", map[string]interface{}{
+			"jid":          jid.String(),
+			"mutualGroups": []string{},
+		})
+	}
+
+	// Fetch mutual groups
+	groups, err := session.Client.GetJoinedGroups(context.Background())
+	if err != nil {
+		return ErrorResponse(c, 500, "Failed to get joined groups", "FETCH_FAILED", err.Error())
+	}
+
+	mutualGroups := []string{}
+	phoneNumber := jid.User // Store phone number for comparison
+
+	log.Printf("🔍 [Mutual Groups] Starting search for %s in %d groups", phoneNumber, len(groups))
+
+	for i, group := range groups {
+		// Add delay to avoid rate limiting (skip delay for first request)
+		if i > 0 {
+			time.Sleep(1 * time.Second) // 1 second delay between requests
+		}
+
+		// Get group info to check if contact is a member
+		groupInfo, err := session.Client.GetGroupInfo(context.Background(), group.JID)
+		if err == nil {
+			log.Printf("📋 [%d/%d] Checking group: %s (%d participants)", i+1, len(groups), groupInfo.Name, len(groupInfo.Participants))
+
+			for _, participant := range groupInfo.Participants {
+				participantPhone := participant.JID.User
+
+				// If participant is LID, resolve to phone number
+				if participant.JID.Server == "lid" {
+					phoneJID, err := session.Client.Store.LIDs.GetPNForLID(context.Background(), participant.JID)
+					if err == nil && phoneJID.User != "" {
+						participantPhone = phoneJID.User
+					}
+				}
+
+				// Compare phone numbers
+				if participantPhone == phoneNumber {
+					mutualGroups = append(mutualGroups, groupInfo.Name)
+					log.Printf("✅ [%d/%d] Found match in: %s", i+1, len(groups), groupInfo.Name)
+					break
+				}
+			}
+		} else {
+			log.Printf("⚠️ [%d/%d] Error getting group info: %v", i+1, len(groups), err)
+		}
+	}
+
+	log.Printf("🎉 [Mutual Groups] Search complete! Found %d mutual groups", len(mutualGroups))
+
+	return SuccessResponse(c, 200, "Mutual groups retrieved successfully", map[string]interface{}{
+		"jid":          jid.String(),
+		"mutualGroups": mutualGroups,
+		"total":        len(mutualGroups),
+	})
 }
 
 // GET /contacts/:instanceId?page=1&limit=50&search=john
