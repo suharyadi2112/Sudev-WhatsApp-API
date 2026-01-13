@@ -264,7 +264,12 @@ func main() {
 	// Message routes by instance id
 	api.POST("/send/:instanceId", handler.SendMessage)
 	api.POST("/check/:instanceId", handler.CheckNumber)
+
+	// Contact routes
 	api.GET("/contacts/:instanceId", handler.GetContactList)
+	api.GET("/contacts/:instanceId/export", handler.ExportContacts)
+	api.GET("/contacts/:instanceId/:jid", handler.GetContactDetail)
+
 	// Media routes by instance id
 	api.POST("/send/:instanceId/media", handler.SendMediaFile)
 	api.POST("/send/:instanceId/media-url", handler.SendMediaURL)
