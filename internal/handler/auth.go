@@ -79,7 +79,12 @@ func LoginJWT(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Error generating token"})
 	}
-	return c.JSON(http.StatusOK, map[string]string{"token": token})
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"token":           token,
+		"deprecated":      true,
+		"warning":         "This endpoint is deprecated. Please use POST /login instead for better security and features.",
+		"migration_guide": "New endpoint supports multi-user, refresh tokens, and audit logging.",
+	})
 }
 
 func ValidateToken(c echo.Context) error {

@@ -14,11 +14,11 @@ import (
 	"gowa-yourself/internal/handler"
 	warmingHandler "gowa-yourself/internal/handler/warming"
 	"gowa-yourself/internal/helper"
+	customMiddleware "gowa-yourself/internal/middleware"
 	"gowa-yourself/internal/service"
 	"gowa-yourself/internal/worker"
 
 	"github.com/joho/godotenv"
-	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"golang.org/x/time/rate"
@@ -122,6 +122,9 @@ func main() {
 	//user jwt
 	handler.InitLoginConfig()
 
+	// Initialize authentication service (for new user management)
+	service.InitAuthConfig(jwtSecret)
+
 	// **************************
 	// main proses.
 	//***************************
@@ -198,7 +201,20 @@ func main() {
 			},
 		),
 	}))
-	e.POST("/login-jwt", handler.LoginJWT)      // di luar group JWT
+
+	// =====================================================
+	// PUBLIC ROUTES (No authentication required)
+	// =====================================================
+
+	// New user authentication endpoints
+	e.POST("/register", handler.Register)
+	e.POST("/login", handler.LoginUser)
+	e.POST("/refresh", handler.RefreshToken)
+
+	// Legacy endpoint (deprecated, use /login instead)
+	e.POST("/login-jwt", handler.LoginJWT)
+
+	// WebSocket and health check
 	e.GET("/ws", handler.WebSocketHandler(hub)) //listen socket gorilla
 	e.GET("/", func(c echo.Context) error {     // Health check
 		return c.JSON(200, map[string]interface{}{
@@ -209,17 +225,7 @@ func main() {
 	})
 
 	// Daftar group route yang butuh JWT
-	api := e.Group("/api", echojwt.WithConfig(echojwt.Config{
-		SigningKey: handler.JwtKey,
-		ErrorHandler: func(c echo.Context, err error) error {
-			// Custom response untuk JWT authentication error
-			return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-				"success": false,
-				"error":   "Authentication required",
-				"message": "Please provide a valid Bearer token in the Authorization header",
-			})
-		},
-	}))
+	api := e.Group("/api", customMiddleware.JWTAuthMiddleware())
 	api.GET("/validate", handler.ValidateToken)
 
 	e.HTTPErrorHandler = func(err error, c echo.Context) {
@@ -247,6 +253,18 @@ func main() {
 
 		c.JSON(code, response)
 	}
+
+	// =====================================================
+	// USER PROFILE ROUTES (JWT required)
+	// =====================================================
+	api.GET("/me", handler.GetCurrentUser)
+	api.PUT("/me", handler.UpdateCurrentUser)
+	api.PUT("/me/password", handler.ChangePassword)
+	api.POST("/logout", handler.LogoutUser)
+
+	// =====================================================
+	// WHATSAPP INSTANCE ROUTES (JWT required)
+	// =====================================================
 
 	// Routes
 	api.POST("/login", handler.Login)

@@ -311,7 +311,136 @@ func InitCustomSchema() {
 		log.Println("✅ Unique constraint added: One whitelisted number per active HUMAN_VS_BOT room")
 	}
 
-	log.Println("schema created/ensured successfully (including warming system)")
+	// =====================================================
+	// USER MANAGEMENT SYSTEM SCHEMA
+	// =====================================================
+	userManagementSchema := `
+		-- =====================================================
+		-- Table: users
+		-- Purpose: User accounts for authentication & authorization
+		-- =====================================================
+		CREATE TABLE IF NOT EXISTS users (
+			id SERIAL PRIMARY KEY,
+			username VARCHAR(50) UNIQUE NOT NULL,
+			email VARCHAR(255) UNIQUE NOT NULL,
+			password_hash VARCHAR(255),  -- Nullable for OAuth users
+			full_name VARCHAR(100),
+			avatar_url VARCHAR(500),  -- Profile picture from OAuth provider
+			auth_provider VARCHAR(20) NOT NULL DEFAULT 'local',  -- 'local' or 'google'
+			oauth_provider_id VARCHAR(255),  -- Google user ID
+			role VARCHAR(20) NOT NULL DEFAULT 'user',
+			is_active BOOLEAN DEFAULT true,
+			email_verified BOOLEAN DEFAULT false,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			last_login_at TIMESTAMP WITH TIME ZONE,
+			CONSTRAINT chk_role CHECK (role IN ('admin', 'user', 'viewer')),
+			CONSTRAINT chk_auth_provider CHECK (auth_provider IN ('local', 'google'))
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+		CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+		CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+		CREATE INDEX IF NOT EXISTS idx_users_auth_provider ON users(auth_provider);
+		CREATE INDEX IF NOT EXISTS idx_users_oauth_provider_id ON users(oauth_provider_id);
+
+		COMMENT ON TABLE users IS 'User accounts for authentication and authorization';
+		COMMENT ON COLUMN users.username IS 'Unique username for login';
+		COMMENT ON COLUMN users.email IS 'Unique email address';
+		COMMENT ON COLUMN users.password_hash IS 'Bcrypt hashed password (NULL for OAuth users)';
+		COMMENT ON COLUMN users.auth_provider IS 'Authentication provider: local (password) or google (OAuth)';
+		COMMENT ON COLUMN users.oauth_provider_id IS 'External provider user ID (e.g., Google user ID)';
+		COMMENT ON COLUMN users.role IS 'User role: admin (full access), user (standard), viewer (read-only)';
+
+		-- =====================================================
+		-- Table: refresh_tokens
+		-- Purpose: Store refresh tokens for long-lived sessions
+		-- =====================================================
+		CREATE TABLE IF NOT EXISTS refresh_tokens (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			token VARCHAR(255) UNIQUE NOT NULL,
+			expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			revoked BOOLEAN DEFAULT false,
+			ip_address VARCHAR(45),
+			user_agent TEXT
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+		CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
+		CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
+
+		COMMENT ON TABLE refresh_tokens IS 'Refresh tokens for maintaining user sessions';
+		COMMENT ON COLUMN refresh_tokens.token IS 'Unique refresh token string';
+		COMMENT ON COLUMN refresh_tokens.expires_at IS 'Token expiration timestamp';
+		COMMENT ON COLUMN refresh_tokens.revoked IS 'True if token has been revoked (logout)';
+
+		-- =====================================================
+		-- Table: user_instances
+		-- Purpose: User-instance ownership and permissions
+		-- =====================================================
+		CREATE TABLE IF NOT EXISTS user_instances (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			instance_id VARCHAR(255) NOT NULL REFERENCES instances(instance_id) ON DELETE CASCADE,
+			permission_level VARCHAR(20) NOT NULL DEFAULT 'owner',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			CONSTRAINT chk_permission CHECK (permission_level IN ('owner', 'editor', 'viewer')),
+			UNIQUE(user_id, instance_id)
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_user_instances_user_id ON user_instances(user_id);
+		CREATE INDEX IF NOT EXISTS idx_user_instances_instance_id ON user_instances(instance_id);
+
+		COMMENT ON TABLE user_instances IS 'User-instance relationship with permission levels';
+		COMMENT ON COLUMN user_instances.permission_level IS 'owner: full control, editor: send messages, viewer: read-only';
+
+		-- =====================================================
+		-- Table: audit_logs
+		-- Purpose: Audit trail for security and compliance
+		-- =====================================================
+		CREATE TABLE IF NOT EXISTS audit_logs (
+			id BIGSERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+			action VARCHAR(50) NOT NULL,
+			resource_type VARCHAR(50),
+			resource_id VARCHAR(255),
+			details JSONB,
+			ip_address VARCHAR(45),
+			user_agent TEXT,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+		CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+		CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
+		CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
+
+		COMMENT ON TABLE audit_logs IS 'Audit trail for all sensitive user actions';
+		COMMENT ON COLUMN audit_logs.action IS 'Action performed: user.login, user.register, instance.create, message.send, etc.';
+		COMMENT ON COLUMN audit_logs.details IS 'Additional context as JSON';
+	`
+	if _, err := db.Exec(userManagementSchema); err != nil {
+		log.Fatalf("failed to init user management schema: %v", err)
+	}
+
+	// Add created_by column to instances table (for user-instance relationship)
+	alterInstancesSchema := `
+		ALTER TABLE instances
+		ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
+		CREATE INDEX IF NOT EXISTS idx_instances_created_by ON instances(created_by);
+
+		COMMENT ON COLUMN instances.created_by IS 'User ID who created this instance';
+	`
+	if _, err := db.Exec(alterInstancesSchema); err != nil {
+		log.Printf("⚠️ Warning: Could not add created_by to instances: %v", err)
+	} else {
+		log.Println("✅ created_by field added to instances table")
+	}
+
+	log.Println("✅ User management schema created successfully")
 }
 
 // seedInitialTemplates populates warming_templates with initial conversation templates
