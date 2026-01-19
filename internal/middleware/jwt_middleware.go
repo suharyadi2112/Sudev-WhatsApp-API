@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"gowa-yourself/internal/model"
 	"gowa-yourself/internal/service"
 
 	"github.com/labstack/echo/v4"
@@ -48,6 +49,28 @@ func JWTAuthMiddleware() echo.MiddlewareFunc {
 					"message": "Invalid or expired token",
 					"error": map[string]string{
 						"code": "INVALID_TOKEN",
+					},
+				})
+			}
+
+			// Check if token is blacklisted
+			isBlacklisted, err := model.IsTokenBlacklisted(tokenString)
+			if err != nil {
+				return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+					"success": false,
+					"message": "Failed to validate token",
+					"error": map[string]string{
+						"code": "TOKEN_VALIDATION_ERROR",
+					},
+				})
+			}
+
+			if isBlacklisted {
+				return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+					"success": false,
+					"message": "Token has been revoked. Please login again.",
+					"error": map[string]string{
+						"code": "TOKEN_REVOKED",
 					},
 				})
 			}

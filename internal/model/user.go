@@ -76,7 +76,7 @@ func CreateUser(user *User) error {
 	query := `
 		INSERT INTO users (username, email, password_hash, full_name, avatar_url, 
 			auth_provider, oauth_provider_id, role, is_active, email_verified)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
 		RETURNING id, created_at, updated_at
 	`
 

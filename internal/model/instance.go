@@ -33,8 +33,9 @@ type Instance struct {
 	Circle          string
 	WebhookURL      sql.NullString
 	WebhookSecret   sql.NullString
-	Used            bool
-	Keterangan      sql.NullString
+	Used            bool           `json:"used"`
+	Keterangan      sql.NullString `json:"keterangan"`
+	CreatedBy       sql.NullInt64  `json:"created_by"`
 }
 
 type InstanceResp struct {
@@ -60,6 +61,7 @@ type InstanceResp struct {
 	Circle            string    `json:"circle"`
 	Used              bool      `json:"used"`
 	Keterangan        string    `json:"keterangan"`
+	CreatedBy         int64     `json:"createdBy,omitempty"`
 }
 
 var ErrNoActiveInstance = errors.New("no active instance for this phone number")
@@ -131,8 +133,8 @@ func GetActiveInstanceByPhoneNumber(phoneNumber string) (*Instance, error) {
 func InsertInstance(in *Instance) error {
 	query := `
     INSERT INTO instances (
-        instance_id, status, is_connected, created_at, session_data, circle, used
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7)`
+        instance_id, status, is_connected, created_at, session_data, circle, used, created_by
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
 	_, err := database.AppDB.Exec(
 		query,
 		in.InstanceID,
@@ -142,6 +144,7 @@ func InsertInstance(in *Instance) error {
 		in.SessionData,
 		in.Circle,
 		true, // Default used = true
+		in.CreatedBy,
 	)
 	return err
 }
@@ -182,7 +185,8 @@ func GetAllInstances() ([]Instance, error) {
             session_data,
 			circle,
 			used,
-			keterangan
+			keterangan,
+			created_by
         FROM instances
         ORDER BY 
             CASE WHEN circle = 'one' THEN 0 ELSE 1 END,
@@ -225,6 +229,7 @@ func GetAllInstances() ([]Instance, error) {
 			&inst.Circle,
 			&inst.Used,
 			&inst.Keterangan,
+			&inst.CreatedBy,
 		)
 
 		if err != nil {
@@ -382,7 +387,8 @@ func GetInstanceByInstanceID(instanceID string) (*Instance, error) {
 			webhook_url,
 			webhook_secret,
 			used,
-			keterangan
+			keterangan,
+			created_by
         FROM instances
         WHERE instance_id = $1
         LIMIT 1
@@ -428,6 +434,7 @@ func GetInstanceByInstanceID(instanceID string) (*Instance, error) {
 		&inst.WebhookSecret,
 		&inst.Used,
 		&inst.Keterangan,
+		&inst.CreatedBy,
 	)
 	if err != nil {
 		return nil, err
@@ -496,9 +503,17 @@ func ToResponse(inst Instance) InstanceResp {
 		resp.LastSeen = inst.LastSeen.Time
 	}
 
+	if inst.Keterangan.Valid {
+		resp.Keterangan = inst.Keterangan.String
+	}
+
 	resp.Used = inst.Used
 	if inst.Keterangan.Valid {
 		resp.Keterangan = inst.Keterangan.String
+	}
+
+	if inst.CreatedBy.Valid {
+		resp.CreatedBy = inst.CreatedBy.Int64
 	}
 
 	return resp

@@ -378,23 +378,22 @@ func InitCustomSchema() {
 
 		-- =====================================================
 		-- Table: user_instances
-		-- Purpose: User-instance ownership and permissions
+		-- Purpose: User-instance access control (Admin/User model)
 		-- =====================================================
 		CREATE TABLE IF NOT EXISTS user_instances (
 			id SERIAL PRIMARY KEY,
 			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			instance_id VARCHAR(255) NOT NULL REFERENCES instances(instance_id) ON DELETE CASCADE,
-			permission_level VARCHAR(20) NOT NULL DEFAULT 'owner',
+			permission_level VARCHAR(20) NOT NULL DEFAULT 'access',
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-			CONSTRAINT chk_permission CHECK (permission_level IN ('owner', 'editor', 'viewer')),
 			UNIQUE(user_id, instance_id)
 		);
 
 		CREATE INDEX IF NOT EXISTS idx_user_instances_user_id ON user_instances(user_id);
 		CREATE INDEX IF NOT EXISTS idx_user_instances_instance_id ON user_instances(instance_id);
 
-		COMMENT ON TABLE user_instances IS 'User-instance relationship with permission levels';
-		COMMENT ON COLUMN user_instances.permission_level IS 'owner: full control, editor: send messages, viewer: read-only';
+		COMMENT ON TABLE user_instances IS 'User-instance access control (presence = authorized)';
+		COMMENT ON COLUMN user_instances.permission_level IS 'Legacy field, not used for authorization (kept for compatibility)';
 
 		-- =====================================================
 		-- Table: audit_logs
@@ -438,6 +437,53 @@ func InitCustomSchema() {
 		log.Printf("⚠️ Warning: Could not add created_by to instances: %v", err)
 	} else {
 		log.Println("✅ created_by field added to instances table")
+	}
+
+	// =====================================================
+	// TOKEN BLACKLIST (for immediate logout/password change)
+	// =====================================================
+	tokenBlacklistSchema := `
+		CREATE TABLE IF NOT EXISTS token_blacklist (
+			id BIGSERIAL PRIMARY KEY,
+			token TEXT NOT NULL,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			reason VARCHAR(50),
+			expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_token_blacklist_token ON token_blacklist(token);
+		CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires_at ON token_blacklist(expires_at);
+		CREATE INDEX IF NOT EXISTS idx_token_blacklist_user_id ON token_blacklist(user_id);
+
+		COMMENT ON TABLE token_blacklist IS 'Blacklisted access tokens for immediate logout';
+		COMMENT ON COLUMN token_blacklist.reason IS 'logout, password_change, security_breach, etc.';
+	`
+	if _, err := db.Exec(tokenBlacklistSchema); err != nil {
+		log.Printf("⚠️ Warning: Could not create token_blacklist: %v", err)
+	} else {
+		log.Println("✅ Token blacklist table created successfully")
+	}
+
+	// =====================================================
+	// SYSTEM SETTINGS TABLE
+	// =====================================================
+	systemSettingsSchema := `
+		CREATE TABLE IF NOT EXISTS system_settings (
+			id SERIAL PRIMARY KEY,
+			key VARCHAR(100) UNIQUE NOT NULL,
+			value JSONB NOT NULL,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(key);
+		
+		COMMENT ON TABLE system_settings IS 'Global system settings and configurations';
+	`
+	if _, err := db.Exec(systemSettingsSchema); err != nil {
+		log.Printf("⚠️ Warning: Could not create system_settings table: %v", err)
+	} else {
+		log.Println("✅ System settings table created successfully")
 	}
 
 	log.Println("✅ User management schema created successfully")

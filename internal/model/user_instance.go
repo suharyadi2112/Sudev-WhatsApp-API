@@ -14,7 +14,7 @@ type UserInstance struct {
 	ID              int64
 	UserID          int64
 	InstanceID      string
-	PermissionLevel string // 'owner', 'editor', 'viewer'
+	PermissionLevel string // Legacy field (not used for authorization)
 	CreatedAt       time.Time
 }
 
@@ -118,25 +118,6 @@ func CheckUserInstancePermission(userID int64, instanceID string) (string, error
 	}
 
 	return permissionLevel, nil
-}
-
-// HasPermissionLevel checks if user has at least the required permission level
-// Permission hierarchy: owner > editor > viewer
-func HasPermissionLevel(userPermission, requiredPermission string) bool {
-	permissionRank := map[string]int{
-		"viewer": 1,
-		"editor": 2,
-		"owner":  3,
-	}
-
-	userRank, userExists := permissionRank[userPermission]
-	requiredRank, requiredExists := permissionRank[requiredPermission]
-
-	if !userExists || !requiredExists {
-		return false
-	}
-
-	return userRank >= requiredRank
 }
 
 // RemoveUserInstance removes a user's access to an instance

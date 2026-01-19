@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"strings"
+	"time"
 
 	"gowa-yourself/internal/helper"
 	"gowa-yourself/internal/model"
@@ -192,7 +194,7 @@ func RefreshToken(c echo.Context) error {
 }
 
 // LogoutUser handles user logout by revoking refresh token
-// POST /logout
+// POST /api/logout
 func LogoutUser(c echo.Context) error {
 	var req RefreshTokenRequest
 	if err := c.Bind(&req); err != nil {
@@ -201,6 +203,28 @@ func LogoutUser(c echo.Context) error {
 
 	if req.RefreshToken == "" {
 		return ErrorResponse(c, http.StatusBadRequest, "Refresh token is required", "MISSING_TOKEN", "")
+	}
+
+	// Get user from context
+	userClaims, _ := c.Get("user_claims").(*service.Claims)
+
+	// Blacklist current access token (immediate logout)
+	if userClaims != nil {
+		authHeader := c.Request().Header.Get("Authorization")
+		if authHeader != "" {
+			parts := strings.Split(authHeader, " ")
+			if len(parts) == 2 {
+				accessToken := parts[1]
+				// Blacklist with expiry = token's original expiry
+				expiresAt := time.Unix(userClaims.ExpiresAt.Unix(), 0)
+				err := model.BlacklistToken(accessToken, userClaims.UserID, "logout", expiresAt)
+				if err != nil {
+					log.Printf("⚠️ Failed to blacklist token: %v", err)
+				} else {
+					log.Printf("✅ Access token blacklisted for user ID: %d", userClaims.UserID)
+				}
+			}
+		}
 	}
 
 	// Revoke refresh token
@@ -212,8 +236,7 @@ func LogoutUser(c echo.Context) error {
 		}
 	}
 
-	// Get user from context (if available) for audit log
-	userClaims, _ := c.Get("user_claims").(*service.Claims)
+	// Log logout
 	if userClaims != nil {
 		_ = model.LogAction(&model.AuditLog{
 			UserID:       sql.NullInt64{Int64: userClaims.UserID, Valid: true},
@@ -342,7 +365,23 @@ func ChangePassword(c echo.Context) error {
 		return ErrorResponse(c, http.StatusInternalServerError, "Failed to update password", "UPDATE_FAILED", err.Error())
 	}
 
-	// Revoke all existing sessions for security
+	// Blacklist current access token (immediate logout)
+	authHeader := c.Request().Header.Get("Authorization")
+	if authHeader != "" {
+		parts := strings.Split(authHeader, " ")
+		if len(parts) == 2 {
+			accessToken := parts[1]
+			expiresAt := time.Unix(userClaims.ExpiresAt.Unix(), 0)
+			err := model.BlacklistToken(accessToken, userClaims.UserID, "password_change", expiresAt)
+			if err != nil {
+				log.Printf("⚠️ Failed to blacklist token: %v", err)
+			} else {
+				log.Printf("✅ Access token blacklisted after password change for user ID: %d", userClaims.UserID)
+			}
+		}
+	}
+
+	// Revoke all existing refresh tokens for security
 	log.Printf("🔍 DEBUG: Revoking all sessions for user ID: %d", user.ID)
 	err = service.RevokeAllUserSessions(user.ID)
 	if err != nil {
