@@ -291,6 +291,12 @@ func eventHandler(instanceID string) func(evt interface{}) {
 				return
 			}
 
+			// Skip messages from self (echo messages)
+			// Ini mencegah duplikasi di Human vs Bot room
+			if v.Info.IsFromMe {
+				return
+			}
+
 			messageText := v.Message.GetConversation()
 
 			// Handle extended text message (reply, link preview, etc)

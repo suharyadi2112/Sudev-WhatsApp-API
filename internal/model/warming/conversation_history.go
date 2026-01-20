@@ -59,8 +59,9 @@ func GetConversationHistory(roomID uuid.UUID, limit int) ([]ai.ConversationMessa
 }
 
 // SaveHumanMessage saves incoming human message to conversation history
-func SaveHumanMessage(roomID uuid.UUID, instanceID, sender, message string) error {
+func SaveHumanMessage(roomID uuid.UUID, instanceID, sender, message string, userID int64) error {
 	// This will be saved via CreateWarmingLog with sender_type='human'
-	// Just a wrapper for clarity
-	return CreateWarmingLog(roomID, 0, instanceID, sender, message, "SUCCESS", "", "human")
+	// sender (human phone) should be senderInstanceID
+	// instanceID (bot) should be receiverInstanceID
+	return CreateWarmingLog(roomID, 0, sender, instanceID, message, "SUCCESS", "", "human", userID)
 }

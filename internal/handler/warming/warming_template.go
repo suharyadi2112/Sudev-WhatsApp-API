@@ -20,7 +20,13 @@ func CreateWarmingTemplate(c echo.Context) error {
 		return handler.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", "BAD_REQUEST", err.Error())
 	}
 
-	template, err := warmingService.CreateWarmingTemplateService(&req)
+	// Extract user ID from JWT context
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	template, err := warmingService.CreateWarmingTemplateService(&req, userID)
 	if err != nil {
 		if errors.Is(err, warmingService.ErrTemplateCategoryRequired) {
 			return handler.ErrorResponse(c, http.StatusBadRequest, err.Error(), "CATEGORY_REQUIRED", "")
@@ -49,7 +55,19 @@ func CreateWarmingTemplate(c echo.Context) error {
 func GetAllWarmingTemplates(c echo.Context) error {
 	category := c.QueryParam("category")
 
-	templates, err := warmingService.GetAllWarmingTemplatesService(category)
+	// Extract user context from JWT
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	role, ok := c.Get("role").(string)
+	if !ok {
+		role = "user"
+	}
+	isAdmin := role == "admin"
+
+	templates, err := warmingService.GetAllWarmingTemplatesService(category, userID, isAdmin)
 	if err != nil {
 		return handler.ErrorResponse(c, http.StatusInternalServerError, "Failed to get templates", "GET_FAILED", err.Error())
 	}
@@ -98,6 +116,26 @@ func UpdateWarmingTemplate(c echo.Context) error {
 		return handler.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", "BAD_REQUEST", err.Error())
 	}
 
+	// Extract user context from JWT
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	role, ok := c.Get("role").(string)
+	if !ok {
+		role = "user"
+	}
+	isAdmin := role == "admin"
+
+	// RBAC: Check ownership (Skip if admin)
+	if !isAdmin {
+		isOwner, err := warmingModel.CheckTemplateOwnership(id, userID)
+		if err != nil || !isOwner {
+			return handler.ErrorResponse(c, http.StatusForbidden, "You don't have permission to update this template", "FORBIDDEN", "")
+		}
+	}
+
 	err = warmingService.UpdateWarmingTemplateService(id, &req)
 	if err != nil {
 		if errors.Is(err, warmingService.ErrTemplateCategoryRequired) {
@@ -133,6 +171,26 @@ func DeleteWarmingTemplate(c echo.Context) error {
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
 		return handler.ErrorResponse(c, http.StatusBadRequest, "Invalid template ID", "INVALID_ID", err.Error())
+	}
+
+	// Extract user context from JWT
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	role, ok := c.Get("role").(string)
+	if !ok {
+		role = "user"
+	}
+	isAdmin := role == "admin"
+
+	// RBAC: Check ownership (Skip if admin)
+	if !isAdmin {
+		isOwner, err := warmingModel.CheckTemplateOwnership(id, userID)
+		if err != nil || !isOwner {
+			return handler.ErrorResponse(c, http.StatusForbidden, "You don't have permission to delete this template", "FORBIDDEN", "")
+		}
 	}
 
 	err = warmingService.DeleteWarmingTemplateService(id)

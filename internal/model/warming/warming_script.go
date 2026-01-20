@@ -14,6 +14,7 @@ type WarmingScript struct {
 	Title       string
 	Description sql.NullString
 	Category    sql.NullString
+	CreatedBy   sql.NullInt64
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
@@ -24,6 +25,7 @@ type WarmingScriptResponse struct {
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	Category    string    `json:"category"`
+	CreatedBy   *int64    `json:"createdBy,omitempty"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
@@ -43,11 +45,11 @@ type UpdateWarmingScriptRequest struct {
 }
 
 // CreateWarmingScript inserts new warming script
-func CreateWarmingScript(req *CreateWarmingScriptRequest) (*WarmingScript, error) {
+func CreateWarmingScript(req *CreateWarmingScriptRequest, userID int64) (*WarmingScript, error) {
 	query := `
-		INSERT INTO warming_scripts (title, description, category, created_at, updated_at)
-		VALUES ($1, $2, $3, NOW(), NOW())
-		RETURNING id, title, description, category, created_at, updated_at
+		INSERT INTO warming_scripts (title, description, category, created_by, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, NOW(), NOW())
+		RETURNING id, title, description, category, created_by, created_at, updated_at
 	`
 
 	script := &WarmingScript{}
@@ -56,11 +58,13 @@ func CreateWarmingScript(req *CreateWarmingScriptRequest) (*WarmingScript, error
 		req.Title,
 		nullString(req.Description),
 		nullString(req.Category),
+		userID,
 	).Scan(
 		&script.ID,
 		&script.Title,
 		&script.Description,
 		&script.Category,
+		&script.CreatedBy,
 		&script.CreatedAt,
 		&script.UpdatedAt,
 	)
@@ -73,14 +77,21 @@ func CreateWarmingScript(req *CreateWarmingScriptRequest) (*WarmingScript, error
 }
 
 // GetAllWarmingScripts retrieves all scripts with optional filters
-func GetAllWarmingScripts(q, category string) ([]WarmingScript, error) {
+func GetAllWarmingScripts(q, category string, userID int64, isAdmin bool) ([]WarmingScript, error) {
 	query := `
-		SELECT id, title, description, category, created_at, updated_at
+		SELECT id, title, description, category, created_by, created_at, updated_at
 		FROM warming_scripts
 		WHERE 1=1
 	`
 	args := []interface{}{}
 	argCount := 1
+
+	// RBAC: Filter by ownership for non-admin users
+	if !isAdmin {
+		query += fmt.Sprintf(" AND (created_by = $%d OR created_by IS NULL)", argCount)
+		args = append(args, userID)
+		argCount++
+	}
 
 	// Filter by search query (title or description)
 	if strings.TrimSpace(q) != "" {
@@ -112,6 +123,7 @@ func GetAllWarmingScripts(q, category string) ([]WarmingScript, error) {
 			&script.Title,
 			&script.Description,
 			&script.Category,
+			&script.CreatedBy,
 			&script.CreatedAt,
 			&script.UpdatedAt,
 		)
@@ -127,7 +139,7 @@ func GetAllWarmingScripts(q, category string) ([]WarmingScript, error) {
 // GetWarmingScriptByID retrieves single script by ID
 func GetWarmingScriptByID(id int) (*WarmingScript, error) {
 	query := `
-		SELECT id, title, description, category, created_at, updated_at
+		SELECT id, title, description, category, created_by, created_at, updated_at
 		FROM warming_scripts
 		WHERE id = $1
 	`
@@ -138,6 +150,7 @@ func GetWarmingScriptByID(id int) (*WarmingScript, error) {
 		&script.Title,
 		&script.Description,
 		&script.Category,
+		&script.CreatedBy,
 		&script.CreatedAt,
 		&script.UpdatedAt,
 	)
@@ -204,6 +217,25 @@ func DeleteWarmingScript(id int) error {
 	return nil
 }
 
+// CheckScriptOwnership validates if user owns the script (Admin bypass)
+func CheckScriptOwnership(scriptID int, userID int64) (bool, error) {
+	var ownerID sql.NullInt64
+	err := database.AppDB.QueryRow("SELECT created_by FROM warming_scripts WHERE id = $1", scriptID).Scan(&ownerID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, fmt.Errorf("script not found")
+		}
+		return false, err
+	}
+
+	// If created_by is NULL (public template), deny ownership
+	if !ownerID.Valid {
+		return false, nil
+	}
+
+	return ownerID.Int64 == userID, nil
+}
+
 // ToWarmingScriptResponse converts WarmingScript to response format
 func ToWarmingScriptResponse(script WarmingScript) WarmingScriptResponse {
 	resp := WarmingScriptResponse{
@@ -219,6 +251,11 @@ func ToWarmingScriptResponse(script WarmingScript) WarmingScriptResponse {
 
 	if script.Category.Valid {
 		resp.Category = script.Category.String
+	}
+
+	if script.CreatedBy.Valid {
+		createdBy := script.CreatedBy.Int64
+		resp.CreatedBy = &createdBy
 	}
 
 	return resp

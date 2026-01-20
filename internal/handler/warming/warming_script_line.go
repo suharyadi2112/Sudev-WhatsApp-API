@@ -27,6 +27,26 @@ func CreateWarmingScriptLine(c echo.Context) error {
 		return handler.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", "BAD_REQUEST", err.Error())
 	}
 
+	// Extract user context from JWT
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	role, ok := c.Get("role").(string)
+	if !ok {
+		role = "user"
+	}
+	isAdmin := role == "admin"
+
+	// RBAC: Check parent script ownership (Skip if admin)
+	if !isAdmin {
+		isOwner, err := warmingModel.CheckScriptOwnership(int(scriptID), userID)
+		if err != nil || !isOwner {
+			return handler.ErrorResponse(c, http.StatusForbidden, "You don't have permission to manage lines for this script", "FORBIDDEN", "")
+		}
+	}
+
 	line, err := warmingService.CreateWarmingScriptLineService(scriptID, &req)
 	if err != nil {
 		// Handle validation errors
@@ -59,6 +79,32 @@ func GetAllWarmingScriptLines(c echo.Context) error {
 	scriptID, err := strconv.ParseInt(scriptIDParam, 10, 64)
 	if err != nil {
 		return handler.ErrorResponse(c, http.StatusBadRequest, "Invalid script ID", "INVALID_SCRIPT_ID", err.Error())
+	}
+
+	// Extract user context from JWT
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	role, ok := c.Get("role").(string)
+	if !ok {
+		role = "user"
+	}
+	isAdmin := role == "admin"
+
+	// RBAC: Check parent script access (Skip if admin)
+	// For GetAll (read operation), allow access to public scripts (created_by NULL)
+	if !isAdmin {
+		script, err := warmingModel.GetWarmingScriptByID(int(scriptID))
+		if err != nil {
+			return handler.ErrorResponse(c, http.StatusNotFound, "Script not found", "SCRIPT_NOT_FOUND", "")
+		}
+
+		// If script is not public (has owner) and user is not the owner, deny access
+		if script.CreatedBy.Valid && script.CreatedBy.Int64 != userID {
+			return handler.ErrorResponse(c, http.StatusForbidden, "You don't have permission to view lines for this script", "FORBIDDEN", "")
+		}
 	}
 
 	lines, err := warmingService.GetAllWarmingScriptLinesService(scriptID)
@@ -126,6 +172,26 @@ func UpdateWarmingScriptLine(c echo.Context) error {
 		return handler.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", "BAD_REQUEST", err.Error())
 	}
 
+	// Extract user context from JWT
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	role, ok := c.Get("role").(string)
+	if !ok {
+		role = "user"
+	}
+	isAdmin := role == "admin"
+
+	// RBAC: Check parent script ownership (Skip if admin)
+	if !isAdmin {
+		isOwner, err := warmingModel.CheckScriptOwnership(int(scriptID), userID)
+		if err != nil || !isOwner {
+			return handler.ErrorResponse(c, http.StatusForbidden, "You don't have permission to update this line", "FORBIDDEN", "")
+		}
+	}
+
 	err = warmingService.UpdateWarmingScriptLineService(scriptID, lineID, &req)
 	if err != nil {
 		// Handle validation errors
@@ -148,7 +214,7 @@ func UpdateWarmingScriptLine(c echo.Context) error {
 		return handler.ErrorResponse(c, http.StatusInternalServerError, "Failed to update script line", "UPDATE_FAILED", err.Error())
 	}
 
-	return handler.SuccessResponse(c, http.StatusOK, "Script line updated successfully", map[string]interface{}{
+	return handler.SuccessResponse(c, http.StatusOK, "Line updated successfully", map[string]interface{}{
 		"id": lineID,
 	})
 }
@@ -167,6 +233,26 @@ func DeleteWarmingScriptLine(c echo.Context) error {
 		return handler.ErrorResponse(c, http.StatusBadRequest, "Invalid line ID", "INVALID_LINE_ID", err.Error())
 	}
 
+	// Extract user context from JWT
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	role, ok := c.Get("role").(string)
+	if !ok {
+		role = "user"
+	}
+	isAdmin := role == "admin"
+
+	// RBAC: Check parent script ownership (Skip if admin)
+	if !isAdmin {
+		isOwner, err := warmingModel.CheckScriptOwnership(int(scriptID), userID)
+		if err != nil || !isOwner {
+			return handler.ErrorResponse(c, http.StatusForbidden, "You don't have permission to delete this line", "FORBIDDEN", "")
+		}
+	}
+
 	err = warmingService.DeleteWarmingScriptLineService(scriptID, lineID)
 	if err != nil {
 		if errors.Is(err, warmingService.ErrScriptLineNotFound) {
@@ -175,7 +261,7 @@ func DeleteWarmingScriptLine(c echo.Context) error {
 		return handler.ErrorResponse(c, http.StatusInternalServerError, "Failed to delete script line", "DELETE_FAILED", err.Error())
 	}
 
-	return handler.SuccessResponse(c, http.StatusOK, "Script line deleted successfully", map[string]interface{}{
+	return handler.SuccessResponse(c, http.StatusOK, "Line deleted successfully", map[string]interface{}{
 		"id": lineID,
 	})
 }
@@ -199,6 +285,26 @@ func GenerateWarmingScriptLines(c echo.Context) error {
 	// Default category to casual if not provided
 	if req.Category == "" {
 		req.Category = "casual"
+	}
+
+	// Extract user context from JWT
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	role, ok := c.Get("role").(string)
+	if !ok {
+		role = "user"
+	}
+	isAdmin := role == "admin"
+
+	// RBAC: Check parent script ownership (Skip if admin)
+	if !isAdmin {
+		isOwner, err := warmingModel.CheckScriptOwnership(int(scriptID), userID)
+		if err != nil || !isOwner {
+			return handler.ErrorResponse(c, http.StatusForbidden, "You don't have permission to modify this script", "FORBIDDEN", "")
+		}
 	}
 
 	// Validate category by checking if templates exist in database
@@ -249,6 +355,26 @@ func ReorderWarmingScriptLines(c echo.Context) error {
 	// Validate request
 	if len(req.Lines) == 0 {
 		return handler.ErrorResponse(c, http.StatusBadRequest, "No lines provided for reordering", "EMPTY_LINES", "")
+	}
+
+	// Extract user context from JWT
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	role, ok := c.Get("role").(string)
+	if !ok {
+		role = "user"
+	}
+	isAdmin := role == "admin"
+
+	// RBAC: Check parent script ownership (Skip if admin)
+	if !isAdmin {
+		isOwner, err := warmingModel.CheckScriptOwnership(int(scriptID), userID)
+		if err != nil || !isOwner {
+			return handler.ErrorResponse(c, http.StatusForbidden, "You don't have permission to reorder lines for this script", "FORBIDDEN", "")
+		}
 	}
 
 	err = warmingModel.ReorderScriptLines(scriptID, &req)

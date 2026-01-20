@@ -58,9 +58,16 @@ func HandleIncomingMessage(instanceID, sender, messageText string, chatJID types
 	}
 
 	// Save incoming human message to conversation history
-	if err := warmingModel.SaveHumanMessage(room.ID, instanceID, sender, messageText); err != nil {
+	var userID int64
+	if room.CreatedBy.Valid {
+		userID = room.CreatedBy.Int64
+	}
+	if err := warmingModel.SaveHumanMessage(room.ID, instanceID, sender, messageText, userID); err != nil {
 		log.Printf("[HUMAN_VS_BOT] Warning: failed to save human message: %v", err)
 	}
+
+	// Trigger WebSocket event for real-time UI update (Human message)
+	publishHumanVsBotEvent(room, 0, sender, instanceID, messageText, "SUCCESS", "", "HUMAN")
 
 	// Rate limiting: check cooldown
 	roomKey := room.ID.String()
@@ -204,27 +211,32 @@ func calculateDelay(room *warmingModel.WarmingRoom) time.Duration {
 }
 
 func sendReply(instanceID, recipient, message string, lineID int64, room *warmingModel.WarmingRoom) error {
+	var userID int64
+	if room.CreatedBy.Valid {
+		userID = room.CreatedBy.Int64
+	}
+
 	if !room.SendRealMessage {
-		warmingModel.CreateWarmingLog(room.ID, lineID, instanceID, recipient, message, "SUCCESS", "dry-run mode", "bot")
-		publishHumanVsBotEvent(room, lineID, instanceID, recipient, message, "SUCCESS", "dry-run mode")
+		warmingModel.CreateWarmingLog(room.ID, lineID, instanceID, recipient, message, "SUCCESS", "dry-run mode", "bot", userID)
+		publishHumanVsBotEvent(room, lineID, instanceID, recipient, message, "SUCCESS", "dry-run mode", "BOT")
 		return nil
 	}
 
 	success, errMsg := SendWarmingMessageToPhone(instanceID, recipient, message)
 
 	if !success {
-		warmingModel.CreateWarmingLog(room.ID, lineID, instanceID, recipient, message, "FAILED", errMsg, "bot")
-		publishHumanVsBotEvent(room, lineID, instanceID, recipient, message, "FAILED", errMsg)
+		warmingModel.CreateWarmingLog(room.ID, lineID, instanceID, recipient, message, "FAILED", errMsg, "bot", userID)
+		publishHumanVsBotEvent(room, lineID, instanceID, recipient, message, "FAILED", errMsg, "BOT")
 		return errors.New(errMsg)
 	}
 
-	warmingModel.CreateWarmingLog(room.ID, lineID, instanceID, recipient, message, "SUCCESS", "", "bot")
-	publishHumanVsBotEvent(room, lineID, instanceID, recipient, message, "SUCCESS", "")
+	warmingModel.CreateWarmingLog(room.ID, lineID, instanceID, recipient, message, "SUCCESS", "", "bot", userID)
+	publishHumanVsBotEvent(room, lineID, instanceID, recipient, message, "SUCCESS", "", "BOT")
 
 	return nil
 }
 
-func publishHumanVsBotEvent(room *warmingModel.WarmingRoom, lineID int64, senderID, receiverID, message, status, errorMsg string) {
+func publishHumanVsBotEvent(room *warmingModel.WarmingRoom, lineID int64, senderID, receiverID, message, status, errorMsg, actorRole string) {
 	if Realtime == nil {
 		return
 	}
@@ -239,7 +251,7 @@ func publishHumanVsBotEvent(room *warmingModel.WarmingRoom, lineID int64, sender
 			ReceiverInstanceID: receiverID,
 			Message:            message,
 			SequenceOrder:      room.CurrentSequence,
-			ActorRole:          "BOT",
+			ActorRole:          actorRole,
 			Status:             status,
 			ErrorMessage:       errorMsg,
 			Timestamp:          time.Now().UTC(),

@@ -299,6 +299,42 @@ func InitCustomSchema() {
 		log.Println("✅ sender_type field added to warming_logs (for AI context)")
 	}
 
+	// Add created_by columns to warming tables for RBAC
+	_, err = db.Exec(`
+		-- Add created_by to warming_scripts
+		ALTER TABLE warming_scripts 
+		ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+		
+		CREATE INDEX IF NOT EXISTS idx_warming_scripts_created_by ON warming_scripts(created_by);
+		COMMENT ON COLUMN warming_scripts.created_by IS 'User ID who created this script';
+
+		-- Add created_by to warming_templates
+		ALTER TABLE warming_templates 
+		ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+		
+		CREATE INDEX IF NOT EXISTS idx_warming_templates_created_by ON warming_templates(created_by);
+		COMMENT ON COLUMN warming_templates.created_by IS 'User ID who created this template';
+
+		-- Add created_by to warming_rooms
+		ALTER TABLE warming_rooms 
+		ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+		
+		CREATE INDEX IF NOT EXISTS idx_warming_rooms_created_by ON warming_rooms(created_by);
+		COMMENT ON COLUMN warming_rooms.created_by IS 'User ID who created this room';
+
+		-- Add created_by to warming_logs
+		ALTER TABLE warming_logs 
+		ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+		
+		CREATE INDEX IF NOT EXISTS idx_warming_logs_created_by ON warming_logs(created_by);
+		COMMENT ON COLUMN warming_logs.created_by IS 'User ID who owns the room that generated this log';
+	`)
+	if err != nil {
+		log.Printf("⚠️ Warning: Could not add created_by to warming tables: %v", err)
+	} else {
+		log.Println("✅ created_by field added to warming tables for RBAC")
+	}
+
 	// Add unique constraint for whitelisted_number in ACTIVE HUMAN_VS_BOT rooms
 	_, err = db.Exec(`
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_human_room 

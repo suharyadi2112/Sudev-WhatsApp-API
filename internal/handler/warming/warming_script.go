@@ -19,7 +19,13 @@ func CreateWarmingScript(c echo.Context) error {
 		return handler.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", "BAD_REQUEST", err.Error())
 	}
 
-	script, err := warmingService.CreateWarmingScriptService(&req)
+	// Extract user ID from JWT context
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	script, err := warmingService.CreateWarmingScriptService(&req, userID)
 	if err != nil {
 		// Handle validation errors
 		if errors.Is(err, warmingService.ErrWarmingScriptTitleRequired) {
@@ -44,7 +50,19 @@ func GetAllWarmingScripts(c echo.Context) error {
 	q := c.QueryParam("q")
 	category := c.QueryParam("category")
 
-	scripts, err := warmingService.GetAllWarmingScriptsService(q, category)
+	// Extract user context from JWT
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	role, ok := c.Get("role").(string)
+	if !ok {
+		role = "user" // Default to user if role not found
+	}
+	isAdmin := role == "admin"
+
+	scripts, err := warmingService.GetAllWarmingScriptsService(q, category, userID, isAdmin)
 	if err != nil {
 		return handler.ErrorResponse(c, http.StatusInternalServerError, "Failed to get warming scripts", "GET_FAILED", err.Error())
 	}
@@ -94,6 +112,26 @@ func UpdateWarmingScript(c echo.Context) error {
 		return handler.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", "BAD_REQUEST", err.Error())
 	}
 
+	// Extract user context from JWT
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	role, ok := c.Get("role").(string)
+	if !ok {
+		role = "user"
+	}
+	isAdmin := role == "admin"
+
+	// RBAC: Check ownership (Skip if admin)
+	if !isAdmin {
+		isOwner, err := warmingModel.CheckScriptOwnership(id, userID)
+		if err != nil || !isOwner {
+			return handler.ErrorResponse(c, http.StatusForbidden, "You don't have permission to update this script", "FORBIDDEN", "")
+		}
+	}
+
 	err = warmingService.UpdateWarmingScriptService(id, &req)
 	if err != nil {
 		// Handle validation errors
@@ -124,6 +162,26 @@ func DeleteWarmingScript(c echo.Context) error {
 	id, err := strconv.Atoi(idParam)
 	if err != nil {
 		return handler.ErrorResponse(c, http.StatusBadRequest, "Invalid script ID", "INVALID_ID", err.Error())
+	}
+
+	// Extract user context from JWT
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	role, ok := c.Get("role").(string)
+	if !ok {
+		role = "user"
+	}
+	isAdmin := role == "admin"
+
+	// RBAC: Check ownership (Skip if admin)
+	if !isAdmin {
+		isOwner, err := warmingModel.CheckScriptOwnership(id, userID)
+		if err != nil || !isOwner {
+			return handler.ErrorResponse(c, http.StatusForbidden, "You don't have permission to delete this script", "FORBIDDEN", "")
+		}
 	}
 
 	err = warmingService.DeleteWarmingScriptService(id)

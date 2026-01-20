@@ -93,7 +93,12 @@ func executeRoom(room warmingModel.WarmingRoom, hub ws.RealtimePublisher) error 
 		logStatus = "FAILED"
 	}
 
-	if err := warmingModel.CreateWarmingLog(room.ID, line.ID, senderID, receiverID, message, logStatus, errMsg, "bot"); err != nil {
+	var userID int64
+	if room.CreatedBy.Valid {
+		userID = room.CreatedBy.Int64
+	}
+
+	if err := warmingModel.CreateWarmingLog(room.ID, line.ID, senderID, receiverID, message, logStatus, errMsg, "bot", userID); err != nil {
 		log.Printf("⚠️ Failed to create log: %v", err)
 	}
 
