@@ -42,6 +42,9 @@ func UpdateSystemIdentityFull(c echo.Context) error {
 	if val := c.FormValue("company_name"); val != "" {
 		identity.CompanyName = val
 	}
+	if val := c.FormValue("company_short_name"); val != "" {
+		identity.CompanyShortName = val
+	}
 	if val := c.FormValue("company_description"); val != "" {
 		identity.CompanyDescription = val
 	}

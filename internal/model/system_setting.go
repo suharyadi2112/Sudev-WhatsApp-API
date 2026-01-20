@@ -15,6 +15,7 @@ type SystemIdentity struct {
 	IcoURL             string `json:"ico_url"`
 	SecondLogoURL      string `json:"second_logo_url"`
 	CompanyName        string `json:"company_name"`
+	CompanyShortName   string `json:"company_short_name"`
 	CompanyDescription string `json:"company_description"`
 	CompanyAddress     string `json:"company_address"`
 	CompanyPhone       string `json:"company_phone"`
