@@ -14,11 +14,11 @@ import (
 	"gowa-yourself/internal/handler"
 	warmingHandler "gowa-yourself/internal/handler/warming"
 	"gowa-yourself/internal/helper"
+	customMiddleware "gowa-yourself/internal/middleware"
 	"gowa-yourself/internal/service"
 	"gowa-yourself/internal/worker"
 
 	"github.com/joho/godotenv"
-	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"golang.org/x/time/rate"
@@ -112,15 +112,14 @@ func main() {
 	log.Printf("feature flags -> websocket_incoming_msg: %v, webhook: %v, warming_auto_reply: %v, ai_enabled: %v",
 		config.EnableWebsocketIncomingMessage, config.EnableWebhook, config.WarmingAutoReplyEnabled, config.AIEnabled)
 
-	//jwt
+	//jwt secret for new auth system
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		log.Println("JWT_SECRET is not set")
 	}
-	handler.InitJWTKey(jwtSecret)
 
-	//user jwt
-	handler.InitLoginConfig()
+	// Initialize authentication service (for new user management)
+	service.InitAuthConfig(jwtSecret)
 
 	// **************************
 	// main proses.
@@ -198,7 +197,20 @@ func main() {
 			},
 		),
 	}))
-	e.POST("/login-jwt", handler.LoginJWT)      // di luar group JWT
+
+	// =====================================================
+	// PUBLIC ROUTES (No authentication required)
+	// =====================================================
+
+	// New user authentication endpoints
+	e.POST("/register", handler.Register)
+	e.POST("/login", handler.LoginUser)
+	e.POST("/refresh", handler.RefreshToken)
+
+	// Static file serving for uploaded files
+	e.Static("/uploads", "./uploads")
+
+	// WebSocket and health check
 	e.GET("/ws", handler.WebSocketHandler(hub)) //listen socket gorilla
 	e.GET("/", func(c echo.Context) error {     // Health check
 		return c.JSON(200, map[string]interface{}{
@@ -209,18 +221,7 @@ func main() {
 	})
 
 	// Daftar group route yang butuh JWT
-	api := e.Group("/api", echojwt.WithConfig(echojwt.Config{
-		SigningKey: handler.JwtKey,
-		ErrorHandler: func(c echo.Context, err error) error {
-			// Custom response untuk JWT authentication error
-			return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-				"success": false,
-				"error":   "Authentication required",
-				"message": "Please provide a valid Bearer token in the Authorization header",
-			})
-		},
-	}))
-	api.GET("/validate", handler.ValidateToken)
+	api := e.Group("/api", customMiddleware.JWTAuthMiddleware())
 
 	e.HTTPErrorHandler = func(err error, c echo.Context) {
 		code := http.StatusInternalServerError
@@ -248,60 +249,81 @@ func main() {
 		c.JSON(code, response)
 	}
 
+	// =====================================================
+	// USER PROFILE ROUTES (JWT required)
+	// =====================================================
+	api.GET("/me", handler.GetCurrentUser)
+	api.PUT("/me", handler.UpdateCurrentUser)
+	api.PUT("/me/password", handler.ChangePassword)
+	api.POST("/logout", handler.LogoutUser)
+
+	// File upload
+	api.POST("/me/avatar", handler.UploadAvatar)
+
+	// =====================================================
+	// SYSTEM IDENTITY ROUTES (Admin Only)
+	// =====================================================
+	api.GET("/system/identity", handler.GetSystemIdentityHandler)                                 // Publicly accessible via API token
+	api.POST("/system/identity", handler.UpdateSystemIdentityFull, customMiddleware.RequireAdmin) // Unified: Text + Logos (Admin Only)
+
+	// =====================================================
+	// WHATSAPP INSTANCE ROUTES (JWT required)
+	// =====================================================
+
 	// Routes
 	api.POST("/login", handler.Login)
-	api.GET("/qr/:instanceId", handler.GetQR)
-	api.GET("/status/:instanceId", handler.GetStatus)
-	api.POST("/logout/:instanceId", handler.Logout)
-	api.DELETE("/instances/:instanceId", handler.DeleteInstance)
-	api.DELETE("/qr-cancel/:instanceId", handler.CancelQR)
+	api.GET("/qr/:instanceId", handler.GetQR, customMiddleware.RequireInstanceAccess())
+	api.GET("/status/:instanceId", handler.GetStatus, customMiddleware.RequireInstanceAccess())
+	api.POST("/logout/:instanceId", handler.Logout, customMiddleware.RequireInstanceAccess())
+	api.DELETE("/instances/:instanceId", handler.DeleteInstance, customMiddleware.RequireInstanceAccess())
+	api.DELETE("/qr-cancel/:instanceId", handler.CancelQR, customMiddleware.RequireInstanceAccess())
 
-	// ambil semua instance
-	api.GET("/instances", handler.GetAllInstances)
+	// Get all instances (requires authentication, filtered by user role)
+	api.GET("/instances", handler.GetAllInstances) // JWT already applied to 'api' group
 	// update instance fields (used, keterangan)
-	api.PATCH("/instances/:instanceId", handler.UpdateInstanceFields)
+	api.PATCH("/instances/:instanceId", handler.UpdateInstanceFields, customMiddleware.RequireInstanceAccess())
 
 	// Message routes by instance id
-	api.POST("/send/:instanceId", handler.SendMessage)
-	api.POST("/check/:instanceId", handler.CheckNumber)
+	api.POST("/send/:instanceId", handler.SendMessage, customMiddleware.RequireInstanceAccess())
+	api.POST("/check/:instanceId", handler.CheckNumber, customMiddleware.RequireInstanceAccess())
 
 	// Contact routes
-	api.GET("/contacts/:instanceId", handler.GetContactList)
-	api.GET("/contacts/:instanceId/export", handler.ExportContacts)
-	api.GET("/contacts/:instanceId/:jid", handler.GetContactDetail)
-	api.GET("/contacts/:instanceId/:jid/mutual-groups", handler.GetMutualGroups)
+	api.GET("/contacts/:instanceId", handler.GetContactList, customMiddleware.RequireInstanceAccess())
+	api.GET("/contacts/:instanceId/export", handler.ExportContacts, customMiddleware.RequireInstanceAccess())
+	api.GET("/contacts/:instanceId/:jid", handler.GetContactDetail, customMiddleware.RequireInstanceAccess())
+	api.GET("/contacts/:instanceId/:jid/mutual-groups", handler.GetMutualGroups, customMiddleware.RequireInstanceAccess())
 
 	// Media routes by instance id
-	api.POST("/send/:instanceId/media", handler.SendMediaFile)
-	api.POST("/send/:instanceId/media-url", handler.SendMediaURL)
+	api.POST("/send/:instanceId/media", handler.SendMediaFile, customMiddleware.RequireInstanceAccess())
+	api.POST("/send/:instanceId/media-url", handler.SendMediaURL, customMiddleware.RequireInstanceAccess())
 
-	//Message by nohp
-	api.POST("/by-number/:phoneNumber", handler.SendMessageByNumber)
-	api.POST("/by-number/:phoneNumber/media-url", handler.SendMediaURLByNumber)
-	api.POST("/by-number/:phoneNumber/media-file", handler.SendMediaFileByNumber)
+	//Message by phone number (requires phone number access)
+	api.POST("/by-number/:phoneNumber", handler.SendMessageByNumber, customMiddleware.RequirePhoneNumberAccess())
+	api.POST("/by-number/:phoneNumber/media-url", handler.SendMediaURLByNumber, customMiddleware.RequirePhoneNumberAccess())
+	api.POST("/by-number/:phoneNumber/media-file", handler.SendMediaFileByNumber, customMiddleware.RequirePhoneNumberAccess())
 
 	// Group routes
-	api.GET("/groups/:instanceId", handler.GetGroups)
-	api.POST("/send-group/:instanceId", handler.SendGroupMessage)
-	api.POST("/send-group/:instanceId/media", handler.SendGroupMedia)
-	api.POST("/send-group/:instanceId/media-url", handler.SendGroupMediaURL)
+	api.GET("/groups/:instanceId", handler.GetGroups, customMiddleware.RequireInstanceAccess())
+	api.POST("/send-group/:instanceId", handler.SendGroupMessage, customMiddleware.RequireInstanceAccess())
+	api.POST("/send-group/:instanceId/media", handler.SendGroupMedia, customMiddleware.RequireInstanceAccess())
+	api.POST("/send-group/:instanceId/media-url", handler.SendGroupMediaURL, customMiddleware.RequireInstanceAccess())
 
-	//Group by no hp
-	api.GET("/groups/by-number/:phoneNumber", handler.GetGroupsByNumber)
-	api.POST("/send-group/by-number/:phoneNumber", handler.SendGroupMessageByNumber)
-	api.POST("/send-group/by-number/:phoneNumber/media", handler.SendGroupMediaByNumber)
-	api.POST("/send-group/by-number/:phoneNumber/media-url", handler.SendGroupMediaURLByNumber)
+	//Group by phone number (requires phone number access)
+	api.GET("/groups/by-number/:phoneNumber", handler.GetGroupsByNumber, customMiddleware.RequirePhoneNumberAccess())
+	api.POST("/send-group/by-number/:phoneNumber", handler.SendGroupMessageByNumber, customMiddleware.RequirePhoneNumberAccess())
+	api.POST("/send-group/by-number/:phoneNumber/media", handler.SendGroupMediaByNumber, customMiddleware.RequirePhoneNumberAccess())
+	api.POST("/send-group/by-number/:phoneNumber/media-url", handler.SendGroupMediaURLByNumber, customMiddleware.RequirePhoneNumberAccess())
 
 	//get info akun
-	api.GET("/info-device/:instanceId", handler.GetDeviceInfo)
+	api.GET("/info-device/:instanceId", handler.GetDeviceInfo, customMiddleware.RequireInstanceAccess())
 
 	//----------------------------
 	// WEBSOCKET DAN WEBHOOK
 	//----------------------------
 	//dapatkan pesan masuk, pakai ws
-	api.GET("/listen/:instanceId", handler.ListenMessages(hub))
+	api.GET("/listen/:instanceId", handler.ListenMessages(hub), customMiddleware.RequireInstanceAccess())
 	//webhook
-	api.POST("/instances/:instanceId/webhook-setconfig", handler.SetWebhookConfig)
+	api.POST("/instances/:instanceId/webhook-setconfig", handler.SetWebhookConfig, customMiddleware.RequireInstanceAccess())
 
 	//----------------------------
 	// WARMING SYSTEM

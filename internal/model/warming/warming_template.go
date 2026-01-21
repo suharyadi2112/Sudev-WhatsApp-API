@@ -14,6 +14,7 @@ type WarmingTemplate struct {
 	Category  string
 	Name      string
 	Structure json.RawMessage // JSONB stored as raw JSON
+	CreatedBy sql.NullInt64
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -24,6 +25,7 @@ type WarmingTemplateResponse struct {
 	Category  string          `json:"category"`
 	Name      string          `json:"name"`
 	Structure json.RawMessage `json:"structure"`
+	CreatedBy *int64          `json:"createdBy,omitempty"`
 	CreatedAt time.Time       `json:"createdAt"`
 	UpdatedAt time.Time       `json:"updatedAt"`
 }
@@ -43,11 +45,11 @@ type UpdateWarmingTemplateRequest struct {
 }
 
 // CreateWarmingTemplate inserts new template
-func CreateWarmingTemplate(req *CreateWarmingTemplateRequest) (*WarmingTemplate, error) {
+func CreateWarmingTemplate(req *CreateWarmingTemplateRequest, userID int64) (*WarmingTemplate, error) {
 	query := `
-		INSERT INTO warming_templates (category, name, structure, created_at, updated_at)
-		VALUES ($1, $2, $3, NOW(), NOW())
-		RETURNING id, category, name, structure, created_at, updated_at
+		INSERT INTO warming_templates (category, name, structure, created_by, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, NOW(), NOW())
+		RETURNING id, category, name, structure, created_by, created_at, updated_at
 	`
 
 	template := &WarmingTemplate{}
@@ -56,11 +58,13 @@ func CreateWarmingTemplate(req *CreateWarmingTemplateRequest) (*WarmingTemplate,
 		req.Category,
 		req.Name,
 		req.Structure,
+		userID,
 	).Scan(
 		&template.ID,
 		&template.Category,
 		&template.Name,
 		&template.Structure,
+		&template.CreatedBy,
 		&template.CreatedAt,
 		&template.UpdatedAt,
 	)
@@ -73,24 +77,38 @@ func CreateWarmingTemplate(req *CreateWarmingTemplateRequest) (*WarmingTemplate,
 }
 
 // GetAllWarmingTemplates retrieves all templates with optional category filter
-func GetAllWarmingTemplates(category string) ([]WarmingTemplate, error) {
+func GetAllWarmingTemplates(category string, userID int64, isAdmin bool) ([]WarmingTemplate, error) {
 	var query string
 	var args []interface{}
 
 	if category != "" {
 		query = `
-			SELECT id, category, name, structure, created_at, updated_at
+			SELECT id, category, name, structure, created_by, created_at, updated_at
 			FROM warming_templates
 			WHERE category = $1
-			ORDER BY category, name
 		`
 		args = append(args, category)
+
+		// RBAC: Filter by ownership for non-admin users
+		if !isAdmin {
+			query += " AND (created_by = $2 OR created_by IS NULL)"
+			args = append(args, userID)
+		}
+
+		query += " ORDER BY category, name"
 	} else {
 		query = `
-			SELECT id, category, name, structure, created_at, updated_at
+			SELECT id, category, name, structure, created_by, created_at, updated_at
 			FROM warming_templates
-			ORDER BY category, name
 		`
+
+		// RBAC: Filter by ownership for non-admin users
+		if !isAdmin {
+			query += " WHERE (created_by = $1 OR created_by IS NULL)"
+			args = append(args, userID)
+		}
+
+		query += " ORDER BY category, name"
 	}
 
 	rows, err := database.AppDB.Query(query, args...)
@@ -107,6 +125,7 @@ func GetAllWarmingTemplates(category string) ([]WarmingTemplate, error) {
 			&template.Category,
 			&template.Name,
 			&template.Structure,
+			&template.CreatedBy,
 			&template.CreatedAt,
 			&template.UpdatedAt,
 		)
@@ -122,7 +141,7 @@ func GetAllWarmingTemplates(category string) ([]WarmingTemplate, error) {
 // GetWarmingTemplateByID retrieves single template by ID
 func GetWarmingTemplateByID(id int64) (*WarmingTemplate, error) {
 	query := `
-		SELECT id, category, name, structure, created_at, updated_at
+		SELECT id, category, name, structure, created_by, created_at, updated_at
 		FROM warming_templates
 		WHERE id = $1
 	`
@@ -133,6 +152,7 @@ func GetWarmingTemplateByID(id int64) (*WarmingTemplate, error) {
 		&template.Category,
 		&template.Name,
 		&template.Structure,
+		&template.CreatedBy,
 		&template.CreatedAt,
 		&template.UpdatedAt,
 	)
@@ -199,9 +219,28 @@ func DeleteWarmingTemplate(id int64) error {
 	return nil
 }
 
+// CheckTemplateOwnership validates if user owns the template (Admin bypass)
+func CheckTemplateOwnership(templateID int64, userID int64) (bool, error) {
+	var ownerID sql.NullInt64
+	err := database.AppDB.QueryRow("SELECT created_by FROM warming_templates WHERE id = $1", templateID).Scan(&ownerID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, fmt.Errorf("template not found")
+		}
+		return false, err
+	}
+
+	// If created_by is NULL (public template), deny ownership
+	if !ownerID.Valid {
+		return false, nil
+	}
+
+	return ownerID.Int64 == userID, nil
+}
+
 // ToWarmingTemplateResponse converts WarmingTemplate to response format
 func ToWarmingTemplateResponse(template WarmingTemplate) WarmingTemplateResponse {
-	return WarmingTemplateResponse{
+	resp := WarmingTemplateResponse{
 		ID:        template.ID,
 		Category:  template.Category,
 		Name:      template.Name,
@@ -209,4 +248,11 @@ func ToWarmingTemplateResponse(template WarmingTemplate) WarmingTemplateResponse
 		CreatedAt: template.CreatedAt,
 		UpdatedAt: template.UpdatedAt,
 	}
+
+	if template.CreatedBy.Valid {
+		createdBy := template.CreatedBy.Int64
+		resp.CreatedBy = &createdBy
+	}
+
+	return resp
 }
