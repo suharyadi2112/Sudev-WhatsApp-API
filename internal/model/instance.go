@@ -580,26 +580,3 @@ func UpdateInstanceFields(instanceID string, req *UpdateInstanceFieldsRequest) e
 
 	return nil
 }
-
-// ErrInstanceNotAvailable returned when instance is blocked (used = false)
-var ErrInstanceNotAvailable = errors.New("instance not available for sending messages")
-
-// ValidateInstanceUsed checks if instance is allowed to send messages (returns error if used = false)
-func ValidateInstanceUsed(instanceID string) error {
-	query := `SELECT used FROM instances WHERE instance_id = $1`
-
-	var used bool
-	err := database.AppDB.QueryRow(query, instanceID).Scan(&used)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return fmt.Errorf("instance not found: %s", instanceID)
-		}
-		return fmt.Errorf("failed to check instance availability: %w", err)
-	}
-
-	if !used {
-		return ErrInstanceNotAvailable
-	}
-
-	return nil
-}
