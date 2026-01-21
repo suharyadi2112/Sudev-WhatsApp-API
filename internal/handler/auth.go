@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,86 +18,18 @@ import (
 	"gowa-yourself/internal/service"
 	"gowa-yourself/internal/ws"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 )
 
 // Simpan cancel functions untuk setiap instance
 var qrCancelFuncs = make(map[string]context.CancelFunc)
 var qrCancelMutex sync.RWMutex
-var JwtKey []byte
-var loginUsername string
-var loginPassword string
-
-func InitLoginConfig() {
-	loginUsername = os.Getenv("APP_LOGIN_USERNAME")
-	loginPassword = os.Getenv("APP_LOGIN_PASSWORD")
-}
-
-type Claims struct {
-	Username string `json:"username"`
-	jwt.RegisteredClaims
-}
 
 //**********************************
 //
-//SECTION LOGIN USER JWT
+// WHATSAPP INSTANCE AUTHENTICATION
 //
 //**********************************
-
-func InitJWTKey(secret string) {
-	JwtKey = []byte(secret)
-}
-
-func GenerateJWT(username string) (string, error) {
-	exp := time.Now().Add(1 * time.Hour)
-	claims := Claims{
-		Username: username,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(exp),
-		},
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(JwtKey)
-}
-
-func LoginJWT(c echo.Context) error {
-	var creds struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-	if err := c.Bind(&creds); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Bad request"})
-	}
-
-	if creds.Username != loginUsername || creds.Password != loginPassword {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid credentials"})
-	}
-
-	token, err := GenerateJWT(creds.Username)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Error generating token"})
-	}
-	return c.JSON(http.StatusOK, map[string]string{"token": token})
-}
-
-func ValidateToken(c echo.Context) error {
-	// JWT middleware sudah validasi token sebelum sampai sini
-	// Jika sampai ke handler ini berarti token valid
-	// Optional: Ambil username dari token claims
-	user := c.Get("user").(*jwt.Token)
-	claims := user.Claims.(jwt.MapClaims)
-	username := claims["username"].(string)
-
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"success":  true,
-		"message":  "Token is valid",
-		"username": username,
-	})
-}
-
-//**********************************
-//
 //SECTION LOGIN WHATSAPP
 //
 //**********************************
@@ -145,6 +76,13 @@ func Login(c echo.Context) error {
 		})
 	}
 
+	// Get current user from context (set by JWT middleware)
+	userClaims, ok := c.Get("user_claims").(*service.Claims)
+	var createdBy sql.NullInt64
+	if ok && userClaims != nil {
+		createdBy = sql.NullInt64{Int64: userClaims.UserID, Valid: true}
+	}
+
 	// Insert ke custom DB sudevwa
 	instance := &model.Instance{
 		InstanceID:  instanceID,
@@ -152,10 +90,19 @@ func Login(c echo.Context) error {
 		IsConnected: false,
 		CreatedAt:   time.Now(),
 		Circle:      req.Kelompok,
+		CreatedBy:   createdBy,
 	}
 	err = model.InsertInstance(instance)
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to insert instance", "DB_INSERT_FAILED", err.Error())
+	}
+
+	// Assign initial access if user is logged in
+	if createdBy.Valid {
+		err = model.AssignInstanceToUser(createdBy.Int64, instanceID, "access")
+		if err != nil {
+			log.Printf("⚠️ Warning: Failed to assign access for instance %s to user %d: %v", instanceID, createdBy.Int64, err)
+		}
 	}
 
 	return SuccessResponse(c, 200, "Instance created, QR code required", map[string]interface{}{
@@ -462,11 +409,31 @@ func GetAllInstances(c echo.Context) error {
 		})
 	}
 
+	// Get current user claims
+	userClaims, _ := c.Get("user_claims").(*service.Claims)
+
 	// Ambil semua session memory (active sessions)
 	sessions := service.GetAllSessions()
 	var instances []model.InstanceResp
 
+	// Create a map for quick permission check if not admin
+	var allowedInstances map[string]bool
+	if userClaims != nil && userClaims.Role != "admin" {
+		allowedIDs, _ := model.GetUserInstances(userClaims.UserID)
+		allowedInstances = make(map[string]bool)
+		for _, id := range allowedIDs {
+			allowedInstances[id] = true
+		}
+	}
+
 	for _, inst := range dbInstances {
+		// Filter by permission if not admin
+		if allowedInstances != nil {
+			if !allowedInstances[inst.InstanceID] {
+				continue
+			}
+		}
+
 		log.Printf("🔍 Processing instance: %s", inst.InstanceID)
 
 		// Convert dari model.Instance ke model.InstanceResp (string primitif)

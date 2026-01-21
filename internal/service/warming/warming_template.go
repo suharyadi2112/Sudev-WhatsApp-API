@@ -17,7 +17,7 @@ var (
 )
 
 // CreateWarmingTemplateService creates new template with validation
-func CreateWarmingTemplateService(req *warmingModel.CreateWarmingTemplateRequest) (*warmingModel.WarmingTemplate, error) {
+func CreateWarmingTemplateService(req *warmingModel.CreateWarmingTemplateRequest, userID int64) (*warmingModel.WarmingTemplate, error) {
 	// Validate category
 	if strings.TrimSpace(req.Category) == "" {
 		return nil, ErrTemplateCategoryRequired
@@ -60,7 +60,7 @@ func CreateWarmingTemplateService(req *warmingModel.CreateWarmingTemplateRequest
 	}
 
 	// Create in database
-	template, err := warmingModel.CreateWarmingTemplate(req)
+	template, err := warmingModel.CreateWarmingTemplate(req, userID)
 	if err != nil {
 		// Check for unique constraint violation
 		if strings.Contains(err.Error(), "unique_category_name") || strings.Contains(err.Error(), "duplicate") {
@@ -73,8 +73,8 @@ func CreateWarmingTemplateService(req *warmingModel.CreateWarmingTemplateRequest
 }
 
 // GetAllWarmingTemplatesService retrieves all templates with optional filter
-func GetAllWarmingTemplatesService(category string) ([]warmingModel.WarmingTemplate, error) {
-	templates, err := warmingModel.GetAllWarmingTemplates(category)
+func GetAllWarmingTemplatesService(category string, userID int64, isAdmin bool) ([]warmingModel.WarmingTemplate, error) {
+	templates, err := warmingModel.GetAllWarmingTemplates(category, userID, isAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("service: %w", err)
 	}

@@ -19,7 +19,13 @@ func CreateWarmingRoom(c echo.Context) error {
 		return handler.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", "BAD_REQUEST", err.Error())
 	}
 
-	room, err := warmingService.CreateWarmingRoomService(&req)
+	// Extract user ID from JWT context
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	room, err := warmingService.CreateWarmingRoomService(&req, userID)
 	if err != nil {
 		if errors.Is(err, warmingService.ErrRoomNameRequired) {
 			return handler.ErrorResponse(c, http.StatusBadRequest, err.Error(), "NAME_REQUIRED", "")
@@ -54,7 +60,19 @@ func CreateWarmingRoom(c echo.Context) error {
 func GetAllWarmingRooms(c echo.Context) error {
 	status := c.QueryParam("status")
 
-	rooms, err := warmingService.GetAllWarmingRoomsService(status)
+	// Extract user context from JWT
+	userID, ok := c.Get("user_id").(int64)
+	if !ok {
+		return handler.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
+	}
+
+	role, ok := c.Get("role").(string)
+	if !ok {
+		role = "user"
+	}
+	isAdmin := role == "admin"
+
+	rooms, err := warmingService.GetAllWarmingRoomsService(status, userID, isAdmin)
 	if err != nil {
 		if strings.Contains(err.Error(), "invalid status") {
 			return handler.ErrorResponse(c, http.StatusBadRequest, err.Error(), "INVALID_STATUS", "")

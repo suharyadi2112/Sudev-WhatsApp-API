@@ -13,7 +13,7 @@ var (
 )
 
 // GetAllWarmingLogsService retrieves logs with filters
-func GetAllWarmingLogsService(roomID, status string, limit int) ([]warmingModel.WarmingLog, error) {
+func GetAllWarmingLogsService(roomID, status string, limit int, userID int64, isAdmin bool) ([]warmingModel.WarmingLog, error) {
 	// Validate status if provided
 	if status != "" {
 		validStatuses := map[string]bool{
@@ -36,7 +36,7 @@ func GetAllWarmingLogsService(roomID, status string, limit int) ([]warmingModel.
 		limit = 100 // Default 100
 	}
 
-	logs, err := warmingModel.GetAllWarmingLogs(roomID, status, limit)
+	logs, err := warmingModel.GetAllWarmingLogs(roomID, status, limit, userID, isAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("service: %w", err)
 	}
@@ -44,8 +44,8 @@ func GetAllWarmingLogsService(roomID, status string, limit int) ([]warmingModel.
 	return logs, nil
 }
 
-// GetWarmingLogByIDService retrieves single log by ID
-func GetWarmingLogByIDService(id int64) (*warmingModel.WarmingLog, error) {
+// GetWarmingLogByIDService retrieves single log by ID with RBAC
+func GetWarmingLogByIDService(id int64, userID int64, isAdmin bool) (*warmingModel.WarmingLog, error) {
 	if id <= 0 {
 		return nil, errors.New("invalid log ID")
 	}
@@ -56,6 +56,13 @@ func GetWarmingLogByIDService(id int64) (*warmingModel.WarmingLog, error) {
 			return nil, ErrLogNotFound
 		}
 		return nil, fmt.Errorf("service: %w", err)
+	}
+
+	// RBAC: Check ownership for non-admin users
+	if !isAdmin {
+		if log.CreatedBy.Valid && log.CreatedBy.Int64 != userID {
+			return nil, errors.New("forbidden: you do not own this log")
+		}
 	}
 
 	return log, nil

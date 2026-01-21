@@ -435,6 +435,15 @@ func GetGroupsByNumber(c echo.Context) error {
 		return ErrorResponse(c, 500, "Failed to get instance for this phone number", "DB_ERROR", err.Error())
 	}
 
+	// Permission Check
+	userClaims, _ := c.Get("user_claims").(*service.Claims)
+	if userClaims != nil && userClaims.Role != "admin" {
+		_, err := model.CheckUserInstancePermission(userClaims.UserID, inst.InstanceID)
+		if err != nil {
+			return ErrorResponse(c, 403, "Insufficient permission to use this phone number", "FORBIDDEN", "")
+		}
+	}
+
 	session, err := service.GetSession(inst.InstanceID)
 	if err != nil {
 		return ErrorResponse(c, 404, "Session not found", "SESSION_NOT_FOUND", "")
@@ -492,6 +501,15 @@ func SendGroupMessageByNumber(c echo.Context) error {
 			return ErrorResponse(c, 404, "No active instance for this phone number", "NO_ACTIVE_INSTANCE", "Please login / scan QR for this number")
 		}
 		return ErrorResponse(c, 500, "Failed to get instance for this phone number", "DB_ERROR", err.Error())
+	}
+
+	// Permission Check
+	userClaims, _ := c.Get("user_claims").(*service.Claims)
+	if userClaims != nil && userClaims.Role != "admin" {
+		_, err := model.CheckUserInstancePermission(userClaims.UserID, inst.InstanceID)
+		if err != nil {
+			return ErrorResponse(c, 403, "Insufficient permission to use this phone number", "FORBIDDEN", "")
+		}
 	}
 
 	// 2. Ambil session dari memory berdasarkan instance_id
@@ -595,6 +613,15 @@ func SendGroupMediaByNumber(c echo.Context) error {
 			return ErrorResponse(c, 404, "No active instance for this phone number", "NO_ACTIVE_INSTANCE", "Please login / scan QR for this number")
 		}
 		return ErrorResponse(c, 500, "Failed to get instance for this phone number", "DB_ERROR", err.Error())
+	}
+
+	// Permission Check
+	userClaims, _ := c.Get("user_claims").(*service.Claims)
+	if userClaims != nil && userClaims.Role != "admin" {
+		_, err := model.CheckUserInstancePermission(userClaims.UserID, inst.InstanceID)
+		if err != nil {
+			return ErrorResponse(c, 403, "Insufficient permission to use this phone number", "FORBIDDEN", "")
+		}
 	}
 
 	// 2. Ambil session dari memory berdasarkan instance_id
@@ -745,6 +772,15 @@ func SendGroupMediaURLByNumber(c echo.Context) error {
 			return ErrorResponse(c, 404, "No active instance for this phone number", "NO_ACTIVE_INSTANCE", "Please login / scan QR for this number")
 		}
 		return ErrorResponse(c, 500, "Failed to get instance for this phone number", "DB_ERROR", err.Error())
+	}
+
+	// Permission Check
+	userClaims, _ := c.Get("user_claims").(*service.Claims)
+	if userClaims != nil && userClaims.Role != "admin" {
+		_, err := model.CheckUserInstancePermission(userClaims.UserID, inst.InstanceID)
+		if err != nil {
+			return ErrorResponse(c, 403, "Insufficient permission to use this phone number", "FORBIDDEN", "")
+		}
 	}
 
 	// 2. Ambil session dari memory berdasarkan instance_id

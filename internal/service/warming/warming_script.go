@@ -16,7 +16,7 @@ var (
 )
 
 // CreateWarmingScriptService creates new warming script with validation
-func CreateWarmingScriptService(req *warmingModel.CreateWarmingScriptRequest) (*warmingModel.WarmingScript, error) {
+func CreateWarmingScriptService(req *warmingModel.CreateWarmingScriptRequest, userID int64) (*warmingModel.WarmingScript, error) {
 	// Validate title
 	if strings.TrimSpace(req.Title) == "" {
 		return nil, ErrWarmingScriptTitleRequired
@@ -32,7 +32,7 @@ func CreateWarmingScriptService(req *warmingModel.CreateWarmingScriptRequest) (*
 	}
 
 	// Create in database
-	script, err := warmingModel.CreateWarmingScript(req)
+	script, err := warmingModel.CreateWarmingScript(req, userID)
 	if err != nil {
 		return nil, fmt.Errorf("service: %w", err)
 	}
@@ -41,8 +41,8 @@ func CreateWarmingScriptService(req *warmingModel.CreateWarmingScriptRequest) (*
 }
 
 // GetAllWarmingScriptsService retrieves all scripts with filters
-func GetAllWarmingScriptsService(q, category string) ([]warmingModel.WarmingScript, error) {
-	scripts, err := warmingModel.GetAllWarmingScripts(q, category)
+func GetAllWarmingScriptsService(q, category string, userID int64, isAdmin bool) ([]warmingModel.WarmingScript, error) {
+	scripts, err := warmingModel.GetAllWarmingScripts(q, category, userID, isAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("service: %w", err)
 	}

@@ -23,7 +23,7 @@ var (
 )
 
 // CreateWarmingRoomService creates new room with validation
-func CreateWarmingRoomService(req *warmingModel.CreateWarmingRoomRequest) (*warmingModel.WarmingRoom, error) {
+func CreateWarmingRoomService(req *warmingModel.CreateWarmingRoomRequest, userID int64) (*warmingModel.WarmingRoom, error) {
 	// Validate name
 	if strings.TrimSpace(req.Name) == "" {
 		return nil, ErrRoomNameRequired
@@ -146,7 +146,7 @@ func CreateWarmingRoomService(req *warmingModel.CreateWarmingRoomRequest) (*warm
 	}
 
 	// Create in database
-	room, err := warmingModel.CreateWarmingRoom(req)
+	room, err := warmingModel.CreateWarmingRoom(req, userID)
 	if err != nil {
 		return nil, fmt.Errorf("service: %w", err)
 	}
@@ -155,7 +155,7 @@ func CreateWarmingRoomService(req *warmingModel.CreateWarmingRoomRequest) (*warm
 }
 
 // GetAllWarmingRoomsService retrieves all rooms with optional filter
-func GetAllWarmingRoomsService(status string) ([]warmingModel.WarmingRoom, error) {
+func GetAllWarmingRoomsService(status string, userID int64, isAdmin bool) ([]warmingModel.WarmingRoom, error) {
 	// Validate status if provided
 	if status != "" {
 		validStatuses := map[string]bool{
@@ -169,7 +169,7 @@ func GetAllWarmingRoomsService(status string) ([]warmingModel.WarmingRoom, error
 		}
 	}
 
-	rooms, err := warmingModel.GetAllWarmingRooms(status)
+	rooms, err := warmingModel.GetAllWarmingRooms(status, userID, isAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("service: %w", err)
 	}
