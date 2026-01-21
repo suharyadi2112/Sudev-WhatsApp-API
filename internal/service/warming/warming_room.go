@@ -64,9 +64,6 @@ func CreateWarmingRoomService(req *warmingModel.CreateWarmingRoomRequest, userID
 		if senderInstance.Status != "online" {
 			return nil, fmt.Errorf("sender instance '%s' is not online (status: %s)", req.SenderInstanceID, senderInstance.Status)
 		}
-		if !senderInstance.Used {
-			return nil, fmt.Errorf("sender instance '%s' is not available (used=false)", req.SenderInstanceID)
-		}
 
 		// Validate receiver instance exists, online, and available
 		receiverInstance, err := model.GetInstanceByInstanceID(req.ReceiverInstanceID)
@@ -76,9 +73,7 @@ func CreateWarmingRoomService(req *warmingModel.CreateWarmingRoomRequest, userID
 		if receiverInstance.Status != "online" {
 			return nil, fmt.Errorf("receiver instance '%s' is not online (status: %s)", req.ReceiverInstanceID, receiverInstance.Status)
 		}
-		if !receiverInstance.Used {
-			return nil, fmt.Errorf("receiver instance '%s' is not available (used=false)", req.ReceiverInstanceID)
-		}
+
 	}
 
 	// HUMAN_VS_BOT specific validation
@@ -100,9 +95,6 @@ func CreateWarmingRoomService(req *warmingModel.CreateWarmingRoomRequest, userID
 		}
 		if senderInstance.Status != "online" {
 			return nil, fmt.Errorf("sender instance '%s' is not online (status: %s)", req.SenderInstanceID, senderInstance.Status)
-		}
-		if !senderInstance.Used {
-			return nil, fmt.Errorf("sender instance '%s' is not available (used=false)", req.SenderInstanceID)
 		}
 
 		// Set default reply delays if not provided
