@@ -525,6 +525,71 @@ func InitCustomSchema() {
 	}
 
 	log.Println("✅ User management schema created successfully")
+
+	// =====================================================
+	// WORKER BLAST OUTBOX SCHEMA
+	// =====================================================
+	workerConfigSchema := `
+		CREATE TABLE IF NOT EXISTS outbox_worker_config (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			worker_name VARCHAR(100) NOT NULL,
+			circle VARCHAR(50) NOT NULL,
+			application VARCHAR(100) NOT NULL,
+			message_type VARCHAR(20) DEFAULT 'direct' NOT NULL CHECK (message_type IN ('direct', 'group')),
+			interval_seconds INTEGER DEFAULT 10 NOT NULL,
+			enabled BOOLEAN DEFAULT true NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			CONSTRAINT unique_user_worker UNIQUE (user_id, worker_name)
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_worker_config_user_id ON outbox_worker_config(user_id);
+		CREATE INDEX IF NOT EXISTS idx_worker_config_circle ON outbox_worker_config(circle);
+		CREATE INDEX IF NOT EXISTS idx_worker_config_enabled ON outbox_worker_config(enabled);
+		CREATE INDEX IF NOT EXISTS idx_worker_config_application ON outbox_worker_config(application);
+
+		COMMENT ON TABLE outbox_worker_config IS 'Database-driven worker configuration for dynamic blast outbox processing';
+	`
+	if _, err := db.Exec(workerConfigSchema); err != nil {
+		log.Printf("⚠️ Warning: Could not create outbox_worker_config table: %v", err)
+	} else {
+		log.Println("✅ Worker blast outbox configuration table created successfully")
+	}
+
+	// =====================================================
+	// OUTBOX QUEUE SCHEMA (For Message Blasting)
+	// =====================================================
+	outboxTableSchema := `
+		CREATE TABLE IF NOT EXISTS outbox (
+			id_outbox SERIAL PRIMARY KEY,
+			type INTEGER DEFAULT 1,
+			from_number VARCHAR(20),
+			client_id INTEGER,
+			destination VARCHAR(100) NOT NULL,
+			messages TEXT NOT NULL,
+			status INTEGER DEFAULT 0,
+			priority INTEGER DEFAULT 0,
+			application VARCHAR(100),
+			sendingDateTime TIMESTAMP WITH TIME ZONE,
+			insertDateTime TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			table_id VARCHAR(100),
+			file VARCHAR(255),
+			error_count INTEGER DEFAULT 0,
+			msg_error TEXT
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox(status);
+		CREATE INDEX IF NOT EXISTS idx_outbox_application ON outbox(application);
+		CREATE INDEX IF NOT EXISTS idx_outbox_insert_dt ON outbox(insertDateTime);
+
+		COMMENT ON TABLE outbox IS 'Queue table for outgoing WhatsApp messages';
+	`
+	if _, err := db.Exec(outboxTableSchema); err != nil {
+		log.Printf("⚠️ Warning: Could not create outbox table: %v", err)
+	} else {
+		log.Println("✅ Outbox queue table created successfully")
+	}
 }
 
 // seedInitialTemplates populates warming_templates with initial conversation templates

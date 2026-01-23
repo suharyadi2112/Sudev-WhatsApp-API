@@ -45,6 +45,10 @@ func main() {
 	}
 	database.InitAppDB(appDbURL)
 
+	// Initialize separate Outbox DB if set
+	outboxDbURL := os.Getenv("OUTBOX_DATABASE_URL")
+	database.InitOutboxDB(outboxDbURL)
+
 	// feature flags (WEBHOOK & WEBSOCKET)
 	wsEnv := strings.ToLower(os.Getenv("SUDEVWA_ENABLE_WEBSOCKET_INCOMING_MSG"))
 	webhookEnv := strings.ToLower(os.Getenv("SUDEVWA_ENABLE_WEBHOOK"))
@@ -324,6 +328,21 @@ func main() {
 	api.GET("/listen/:instanceId", handler.ListenMessages(hub), customMiddleware.RequireInstanceAccess())
 	//webhook
 	api.POST("/instances/:instanceId/webhook-setconfig", handler.SetWebhookConfig, customMiddleware.RequireInstanceAccess())
+
+	//----------------------------
+	// WORKER BLAST OUTBOX
+	//----------------------------
+	blastOutbox := api.Group("/blast-outbox")
+	blastOutbox.GET("/configs", handler.GetWorkerConfigs)
+	blastOutbox.POST("/configs", handler.CreateWorkerConfig)
+	blastOutbox.GET("/configs/:id", handler.GetWorkerConfig)
+	blastOutbox.PUT("/configs/:id", handler.UpdateWorkerConfig)
+	blastOutbox.DELETE("/configs/:id", handler.DeleteWorkerConfig)
+	blastOutbox.POST("/configs/:id/toggle", handler.ToggleWorkerConfig)
+
+	// Helper endpoints for frontend
+	blastOutbox.GET("/available-circles", handler.GetAvailableCircles)
+	blastOutbox.GET("/available-applications", handler.GetAvailableApplications)
 
 	//----------------------------
 	// WARMING SYSTEM

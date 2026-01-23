@@ -1,0 +1,14 @@
+# Run Worker (Development)
+# Dari root project (RECOMMENDED)
+go run ./cmd/worker
+
+# Atau dari folder cmd/worker
+go run .
+
+# Run Worker (Production dengan PM2)
+# 1. Build binary dulu
+go build -o sudevwa-worker.exe ./cmd/worker  # Windows
+go build -o sudevwa-worker ./cmd/worker      # Ubuntu
+
+# 2. Jalankan dengan PM2
+pm2 start cmd/worker/ecosystem.config.js
