@@ -251,9 +251,9 @@ Here are some previews of the SUDEVWA interface.
 
 | Feature | Preview |
 | :--- | :--- |
-| **Login / Scan QR** | <img width="1902" height="914" alt="image" src="https://github.com/user-attachments/assets/d1c5f823-5eb3-4a95-9dcd-4d58eb7629b6" /> |
-| **Main Dashboard** | <img width="1891" height="908" alt="image" src="https://github.com/user-attachments/assets/a0bb20ef-bdfa-4a5d-9f0b-c61fc5d7f8fe" />|
-| **Instances Management** | <img width="1881" height="825" alt="image" src="https://github.com/user-attachments/assets/4ec19e75-1782-4a8a-b0aa-aa52f29dceef" />|
+| **Login / Scan QR** | <img width="1898" height="908" alt="image" src="https://github.com/user-attachments/assets/eb800f68-34be-4485-8fe7-f3ca1c58dd39" />|
+| **Main Dashboard** | <img width="1892" height="913" alt="image" src="https://github.com/user-attachments/assets/163b9725-9abe-42ae-b222-3dbc56f42b72" />|
+| **Instances Management** | <img width="1876" height="913" alt="image" src="https://github.com/user-attachments/assets/99e0a93a-4dad-4d86-8acf-33b18c07780a" />|
 | **Add Instances** | <img width="955" height="487" alt="image" src="https://github.com/user-attachments/assets/ecfafa8c-26af-444a-aed0-948f14ab84ec" />|
 | **Detail Instances** | <img width="658" height="707" alt="image" src="https://github.com/user-attachments/assets/3ef0056d-9f59-494c-b340-aaff98f20551" />|
 | **Edit Instances** | <img width="537" height="768" alt="image" src="https://github.com/user-attachments/assets/0658a838-e3e6-4983-95de-cfed90838d17" />|
