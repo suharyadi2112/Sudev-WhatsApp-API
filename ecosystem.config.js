@@ -1,19 +1,31 @@
 module.exports = {
     apps: [
         {
-            name: "sudevwa-api", // Nama aplikasi di PM2
-            // script: "./sudevwa.exe", // Binary untuk Windows
-            script: "./sudevwa",   // Binary untuk Ubuntu/Linux
-            watch: false, // Auto-restart saat file berubah (false = production)
-            env_file: ".env", // Load environment variables dari file .env
-            instances: 1, // Jumlah instance (1 = single process, "max" = sesuai CPU core)
-            exec_mode: "fork", // Mode eksekusi ("fork" = standar, "cluster" = Node.js cluster)
-            max_memory_restart: "500M", // Auto restart jika memory > 500MB
-            autorestart: true, // Auto restart jika aplikasi crash
-            max_restarts: 10, // Maksimal restart berturut-turut sebelum PM2 stop
-            min_uptime: "10s", // Minimum waktu hidup agar dianggap "stable"
+            name: "sudevwa-api",
+            script: "./sudevwa", // Ganti sudevwa.exe jika di Windows
+            watch: false,
+            env_file: ".env",
+            instances: 1,
+            exec_mode: "fork",
+            max_memory_restart: "500M",
+            autorestart: true,
+            time: true, // Menambahkan timestamp di log terminal PM2
             env: {
-                NODE_ENV: "production" // Environment variables tambahan
+                NODE_ENV: "production"
+            }
+        },
+        {
+            name: "sudevwa-worker",
+            script: "./worker", // Output binary dari cmd/worker/main.go
+            watch: false,
+            env_file: ".env",
+            instances: 1, // Cukup 1 instance karena Manager di dalamnya sudah handle banyak goroutine
+            exec_mode: "fork",
+            max_memory_restart: "500M", // Worker Go sangat irit RAM, 500M sangat aman
+            autorestart: true,
+            time: true,
+            env: {
+                NODE_ENV: "production"
             }
         }
     ]
