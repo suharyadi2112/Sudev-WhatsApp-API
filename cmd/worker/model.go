@@ -9,13 +9,17 @@ import (
 	"time"
 )
 
-// SQLPlaceholders returns correct placeholders ($1, $2 or ?, ?) based on driver
-func SQLPlaceholders(query string) string {
-	if WorkerDriver != "postgres" {
+// ConfigSQL returns correct placeholders for ConfigDB (always postgres)
+func ConfigSQL(query string) string {
+	return query
+}
+
+// OutboxSQL returns correct placeholders for OutboxDB (mysql or postgres)
+func OutboxSQL(query string) string {
+	if OutboxDriver != "postgres" {
 		// Convert $1, $2, etc to ?
-		// Simple replacement for our specific queries
 		newQuery := query
-		for i := 10; i >= 1; i-- { // Replace from highest to lowest to avoid $10 becoming ?0
+		for i := 10; i >= 1; i-- { // Replace from highest to lowest
 			old := fmt.Sprintf("$%d", i)
 			newQuery = strings.ReplaceAll(newQuery, old, "?")
 		}
@@ -63,7 +67,7 @@ func FetchWorkerConfigs(ctx context.Context) ([]WorkerConfig, error) {
 		WHERE enabled = true
 	`
 
-	rows, err := WorkerDB.QueryContext(ctx, query)
+	rows, err := ConfigDB.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +105,7 @@ func ClaimPendingOutbox(ctx context.Context, filter string) (*OutboxMessage, err
 	// Atomic claim: Find one pending message (status 0), set it to processing (status 3), and return it.
 	// Using FOR UPDATE SKIP LOCKED to prevent multiple workers from claiming the same row.
 	var query string
-	if WorkerDriver == "postgres" {
+	if OutboxDriver == "postgres" {
 		query = `
 			UPDATE outbox 
 			SET status = 3
@@ -139,8 +143,8 @@ func ClaimPendingOutbox(ctx context.Context, filter string) (*OutboxMessage, err
 		// usually done via a transaction and SELECT ... FOR UPDATE.
 	}
 
-	if WorkerDriver == "postgres" {
-		row := WorkerDB.QueryRowContext(ctx, query)
+	if OutboxDriver == "postgres" {
+		row := OutboxDB.QueryRowContext(ctx, query)
 		var msg OutboxMessage
 		err := row.Scan(&msg.ID, &msg.Destination, &msg.Messages, &msg.Status, &msg.Application, &msg.TableID, &msg.File, &msg.InsertDateTime)
 		if err != nil {
@@ -149,7 +153,7 @@ func ClaimPendingOutbox(ctx context.Context, filter string) (*OutboxMessage, err
 		return &msg, nil
 	} else {
 		// MySQL 8.0+ Atomic Claiming via Transaction
-		tx, err := WorkerDB.BeginTx(ctx, nil)
+		tx, err := OutboxDB.BeginTx(ctx, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -201,7 +205,7 @@ func FetchPendingOutbox(ctx context.Context, filter string) (*OutboxMessage, err
 	}
 	query += " ORDER BY insertDateTime ASC LIMIT 1 "
 
-	row := WorkerDB.QueryRowContext(ctx, query)
+	row := OutboxDB.QueryRowContext(ctx, query)
 
 	var msg OutboxMessage
 	err := row.Scan(&msg.ID, &msg.Destination, &msg.Messages, &msg.Status, &msg.Application, &msg.TableID, &msg.File, &msg.InsertDateTime)
@@ -218,7 +222,7 @@ func UpdateOutboxSuccess(ctx context.Context, id int64, fromNumber string) error
 		SET status = 1, sendingDateTime = NOW(), from_number = $1, msg_error = NULL 
 		WHERE id_outbox = $2
 	`
-	res, err := WorkerDB.ExecContext(ctx, SQLPlaceholders(query), fromNumber, id)
+	res, err := OutboxDB.ExecContext(ctx, OutboxSQL(query), fromNumber, id)
 	if err != nil {
 		return err
 	}
@@ -235,7 +239,7 @@ func UpdateOutboxFailed(ctx context.Context, id int64, errorMsg string) error {
 		SET status = 2, msg_error = $1 
 		WHERE id_outbox = $2
 	`
-	res, err := WorkerDB.ExecContext(ctx, SQLPlaceholders(query), errorMsg, id)
+	res, err := OutboxDB.ExecContext(ctx, OutboxSQL(query), errorMsg, id)
 	if err != nil {
 		return err
 	}
@@ -252,7 +256,7 @@ func UpdateOutboxStatus(ctx context.Context, id int64, status int, errorMsg stri
 		SET status = $1, msg_error = $2 
 		WHERE id_outbox = $3
 	`
-	res, err := WorkerDB.ExecContext(ctx, SQLPlaceholders(query), status, errorMsg, id)
+	res, err := OutboxDB.ExecContext(ctx, OutboxSQL(query), status, errorMsg, id)
 	if err != nil {
 		return err
 	}
@@ -272,7 +276,7 @@ func LogWorkerEvent(workerID int, workerName, level, message string) {
 	if workerID > 0 {
 		wID = workerID
 	}
-	_, err := WorkerDB.Exec(SQLPlaceholders(query), wID, workerName, level, message)
+	_, err := ConfigDB.Exec(ConfigSQL(query), wID, workerName, level, message)
 	if err != nil {
 		log.Printf("CRITICAL: Failed to write system log to DB: %v", err)
 	}
