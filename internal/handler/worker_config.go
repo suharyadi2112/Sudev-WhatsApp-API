@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"gowa-yourself/internal/model"
 	"gowa-yourself/internal/service"
 	"net/http"
@@ -8,6 +9,21 @@ import (
 
 	"github.com/labstack/echo/v4"
 )
+
+type WorkerConfigRequest struct {
+	WorkerName         string `json:"worker_name"`
+	Circle             string `json:"circle"`
+	Application        string `json:"application"`
+	MessageType        string `json:"message_type"`
+	IntervalMinSeconds int    `json:"interval_min_seconds"`
+	IntervalSeconds    int    `json:"interval_seconds"` // Alias for backward compatibility
+	IntervalMaxSeconds int    `json:"interval_max_seconds"`
+	Enabled            *bool  `json:"enabled"`
+	WebhookURL         string `json:"webhook_url"`
+	WebhookSecret      string `json:"webhook_secret"`
+	AllowMedia         *bool  `json:"allow_media"`
+	UserID             int    `json:"user_id"` // Used for admin override
+}
 
 // getClaims is a helper to get user claims from context
 func getClaims(c echo.Context) *service.Claims {
@@ -71,28 +87,54 @@ func CreateWorkerConfig(c echo.Context) error {
 		return ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "UNAUTHORIZED", "")
 	}
 
-	var config model.WorkerConfig
-	if err := c.Bind(&config); err != nil {
+	var req WorkerConfigRequest
+	if err := c.Bind(&req); err != nil {
 		return ErrorResponse(c, http.StatusBadRequest, "Invalid request body", "BAD_REQUEST", err.Error())
 	}
 
 	// Validation
-	if config.WorkerName == "" || config.Circle == "" || config.Application == "" {
+	if req.WorkerName == "" || req.Circle == "" || req.Application == "" {
 		return ErrorResponse(c, http.StatusBadRequest, "worker_name, circle, and application are required", "VALIDATION_ERROR", "")
 	}
 
-	if config.MessageType != "direct" && config.MessageType != "group" {
-		return ErrorResponse(c, http.StatusBadRequest, "message_type must be 'direct' or 'group'", "VALIDATION_ERROR", "")
+	if req.MessageType != "direct" && req.MessageType != "group" {
+		req.MessageType = "direct" // Default
 	}
 
-	if config.IntervalSeconds < 1 {
-		return ErrorResponse(c, http.StatusBadRequest, "interval_seconds must be at least 1", "VALIDATION_ERROR", "")
+	if req.IntervalMinSeconds < 1 && req.IntervalSeconds > 0 {
+		req.IntervalMinSeconds = req.IntervalSeconds
+	}
+
+	if req.IntervalMinSeconds < 1 {
+		req.IntervalMinSeconds = 10 // Default
+	}
+
+	// Map to model
+	config := model.WorkerConfig{
+		WorkerName:         req.WorkerName,
+		Circle:             req.Circle,
+		Application:        req.Application,
+		MessageType:        req.MessageType,
+		IntervalSeconds:    req.IntervalMinSeconds,
+		IntervalMaxSeconds: req.IntervalMaxSeconds,
+		Enabled:            true,  // Default
+		AllowMedia:         false, // Default to false
+		WebhookURL:         sql.NullString{String: req.WebhookURL, Valid: req.WebhookURL != ""},
+		WebhookSecret:      sql.NullString{String: req.WebhookSecret, Valid: req.WebhookSecret != ""},
+	}
+
+	if req.Enabled != nil {
+		config.Enabled = *req.Enabled
+	}
+
+	if req.AllowMedia != nil {
+		config.AllowMedia = *req.AllowMedia
 	}
 
 	// Set user_id from authenticated user (admin can override)
 	isAdmin := claims.Role == "admin"
-	if isAdmin && config.UserID != 0 {
-		// Admin can create config for other users
+	if isAdmin && req.UserID != 0 {
+		config.UserID = req.UserID
 	} else {
 		config.UserID = int(claims.UserID)
 	}
@@ -132,26 +174,51 @@ func UpdateWorkerConfig(c echo.Context) error {
 		return ErrorResponse(c, http.StatusForbidden, "Access denied", "FORBIDDEN", "")
 	}
 
-	var config model.WorkerConfig
-	if err := c.Bind(&config); err != nil {
+	var req WorkerConfigRequest
+	if err := c.Bind(&req); err != nil {
 		return ErrorResponse(c, http.StatusBadRequest, "Invalid request body", "BAD_REQUEST", err.Error())
 	}
 
 	// Validation
-	if config.WorkerName == "" || config.Circle == "" || config.Application == "" {
+	if req.WorkerName == "" || req.Circle == "" || req.Application == "" {
 		return ErrorResponse(c, http.StatusBadRequest, "worker_name, circle, and application are required", "VALIDATION_ERROR", "")
 	}
 
-	if config.MessageType != "direct" && config.MessageType != "group" {
-		return ErrorResponse(c, http.StatusBadRequest, "message_type must be 'direct' or 'group'", "VALIDATION_ERROR", "")
+	if req.MessageType != "direct" && req.MessageType != "group" {
+		req.MessageType = "direct"
 	}
 
-	if config.IntervalSeconds < 1 {
-		return ErrorResponse(c, http.StatusBadRequest, "interval_seconds must be at least 1", "VALIDATION_ERROR", "")
+	if req.IntervalMinSeconds < 1 && req.IntervalSeconds > 0 {
+		req.IntervalMinSeconds = req.IntervalSeconds
 	}
 
-	config.ID = id
-	config.UserID = existingConfig.UserID // Preserve original user_id
+	if req.IntervalMinSeconds < 1 {
+		req.IntervalMinSeconds = 10
+	}
+
+	// Map to model
+	config := model.WorkerConfig{
+		ID:                 id,
+		UserID:             existingConfig.UserID, // Preserve original user_id
+		WorkerName:         req.WorkerName,
+		Circle:             req.Circle,
+		Application:        req.Application,
+		MessageType:        req.MessageType,
+		IntervalSeconds:    req.IntervalMinSeconds,
+		IntervalMaxSeconds: req.IntervalMaxSeconds,
+		Enabled:            existingConfig.Enabled, // Default to existing
+		AllowMedia:         existingConfig.AllowMedia,
+		WebhookURL:         sql.NullString{String: req.WebhookURL, Valid: req.WebhookURL != ""},
+		WebhookSecret:      sql.NullString{String: req.WebhookSecret, Valid: req.WebhookSecret != ""},
+	}
+
+	if req.Enabled != nil {
+		config.Enabled = *req.Enabled
+	}
+
+	if req.AllowMedia != nil {
+		config.AllowMedia = *req.AllowMedia
+	}
 
 	if err := model.UpdateWorkerConfig(c.Request().Context(), &config); err != nil {
 		return ErrorResponse(c, http.StatusInternalServerError, "Failed to update worker config", "INTERNAL_ERROR", err.Error())

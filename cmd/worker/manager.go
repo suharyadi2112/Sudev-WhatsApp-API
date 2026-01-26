@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -51,9 +52,9 @@ func (m *WorkerManager) reloadConfigs() {
 
 	configs, err := FetchWorkerConfigs(m.ctx)
 	if err != nil {
-		log.Printf("Error fetching worker configs: %v", err)
-		// If no table exists yet or other error, we might want to check if any active workers exist
-		// but for now we just return
+		msg := fmt.Sprintf("Error fetching worker configs: %v", err)
+		log.Print(msg)
+		LogWorkerEvent(0, "SYSTEM", "ERROR", msg)
 		return
 	}
 
@@ -69,6 +70,7 @@ func (m *WorkerManager) reloadConfigs() {
 		if existingWorker, exists := m.workers[config.ID]; exists {
 			// Update existing worker if config changed (e.g., interval)
 			if existingWorker.config.IntervalSeconds != config.IntervalSeconds ||
+				existingWorker.config.IntervalMaxSeconds != config.IntervalMaxSeconds ||
 				existingWorker.config.Circle != config.Circle ||
 				existingWorker.config.Application != config.Application ||
 				existingWorker.config.MessageType != config.MessageType {

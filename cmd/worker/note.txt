@@ -12,3 +12,16 @@ go build -o sudevwa-worker ./cmd/worker      # Ubuntu
 
 # 2. Jalankan dengan PM2
 pm2 start cmd/worker/ecosystem.config.js
+
+
+Hal Penting yang Harus Diperhatikan: Pastikan saat Anda melakukan build, hasilnya ditaruh di folder root agar sesuai dengan isi ecosystem.config.js.
+
+Contoh perintah build-nya:
+
+# Build API
+go build -o sudevwa main.go
+# Build Worker (Lakukan ini dari root)
+go build -o worker cmd/worker/*.go
+
+Setelah di-build, Anda tinggal jalankan:
+pm2 start ecosystem.config.js

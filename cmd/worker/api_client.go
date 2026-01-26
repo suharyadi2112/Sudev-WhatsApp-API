@@ -221,11 +221,75 @@ func (c *SudevwaClient) SendGroupMessage(instanceID, groupID, message string) (b
 	}
 
 	payload, _ := json.Marshal(map[string]string{
-		"message": message,
-		"to":      groupID,
+		"message":  message,
+		"groupJid": groupID,
 	})
 
 	url := fmt.Sprintf("%s/api/send-group/%s", c.BaseURL, instanceID)
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
+	req.Header.Set("Authorization", "Bearer "+c.AccessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, "", err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	var res APIResponse
+	if err := json.Unmarshal(body, &res); err != nil {
+		return false, string(body), err
+	}
+
+	return res.Success, res.Message, nil
+}
+
+func (c *SudevwaClient) SendMediaURL(instanceID, to, mediaURL, caption string) (bool, string, error) {
+	if err := c.EnsureAuth(); err != nil {
+		return false, "", err
+	}
+
+	payload, _ := json.Marshal(map[string]string{
+		"to":       to,
+		"mediaUrl": mediaURL,
+		"caption":  caption,
+	})
+
+	url := fmt.Sprintf("%s/api/send/%s/media-url", c.BaseURL, instanceID)
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
+	req.Header.Set("Authorization", "Bearer "+c.AccessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, "", err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	var res APIResponse
+	if err := json.Unmarshal(body, &res); err != nil {
+		return false, string(body), err
+	}
+
+	return res.Success, res.Message, nil
+}
+
+func (c *SudevwaClient) SendGroupMediaURL(instanceID, groupID, mediaURL, caption string) (bool, string, error) {
+	if err := c.EnsureAuth(); err != nil {
+		return false, "", err
+	}
+
+	payload, _ := json.Marshal(map[string]string{
+		"groupJid": groupID,
+		"mediaUrl": mediaURL,
+		"message":  caption,
+	})
+
+	url := fmt.Sprintf("%s/api/send-group/%s/media-url", c.BaseURL, instanceID)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	req.Header.Set("Authorization", "Bearer "+c.AccessToken)
 	req.Header.Set("Content-Type", "application/json")

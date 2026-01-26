@@ -539,6 +539,8 @@ func InitCustomSchema() {
 			message_type VARCHAR(20) DEFAULT 'direct' NOT NULL CHECK (message_type IN ('direct', 'group')),
 			interval_seconds INTEGER DEFAULT 10 NOT NULL,
 			enabled BOOLEAN DEFAULT true NOT NULL,
+			webhook_url VARCHAR(255),
+			webhook_secret VARCHAR(255),
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 			CONSTRAINT unique_user_worker UNIQUE (user_id, worker_name)
@@ -554,7 +556,79 @@ func InitCustomSchema() {
 	if _, err := db.Exec(workerConfigSchema); err != nil {
 		log.Printf("⚠️ Warning: Could not create outbox_worker_config table: %v", err)
 	} else {
-		log.Println("✅ Worker blast outbox configuration table created successfully")
+		log.Println("✅ Worker blast outbox configuration table ensured")
+	}
+
+	// 3. Worker System Logs Table
+	workerSystemLogsSchema := `
+		CREATE TABLE IF NOT EXISTS worker_system_logs (
+			id SERIAL PRIMARY KEY,
+			worker_id INTEGER, -- Optional, links to outbox_worker_config
+			worker_name VARCHAR(100) NOT NULL,
+			level VARCHAR(10) NOT NULL, -- INFO, WARN, ERROR
+			message TEXT NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		);
+	`
+	if _, err := db.Exec(workerSystemLogsSchema); err != nil {
+		log.Printf("⚠️ Warning: Could not create worker_system_logs table structure: %v", err)
+	} else {
+		log.Println("✅ Worker system logs table ensured")
+	}
+
+	log.Println("✅ Worker blast outbox configuration schema finalized")
+
+	// =====================================================
+	// ADDING MISSING COLUMNS (FOR EXISTING TABLES)
+	// =====================================================
+	// Postgres doesn't have "ADD COLUMN IF NOT EXISTS" directly in older versions,
+	// so we use a DO block for safety.
+	addColumnLogic := `
+		DO $$ 
+		BEGIN 
+			BEGIN
+				ALTER TABLE outbox_worker_config ADD COLUMN webhook_url VARCHAR(255);
+			EXCEPTION
+				WHEN duplicate_column THEN RAISE NOTICE 'column webhook_url already exists, skipping';
+			END;
+			BEGIN
+				ALTER TABLE outbox_worker_config ADD COLUMN webhook_secret VARCHAR(255);
+			EXCEPTION
+				WHEN duplicate_column THEN RAISE NOTICE 'column webhook_secret already exists, skipping';
+			END;
+			BEGIN
+				ALTER TABLE outbox_worker_config ADD COLUMN allow_media BOOLEAN DEFAULT false NOT NULL;
+			EXCEPTION
+				WHEN duplicate_column THEN RAISE NOTICE 'column allow_media already exists, skipping';
+			END;
+			BEGIN
+				ALTER TABLE outbox_worker_config ADD COLUMN interval_max_seconds INTEGER DEFAULT 0;
+			EXCEPTION
+				WHEN duplicate_column THEN RAISE NOTICE 'column interval_max_seconds already exists, skipping';
+			END;
+			BEGIN
+				ALTER TABLE worker_system_logs ADD COLUMN worker_id INTEGER;
+			EXCEPTION
+				WHEN duplicate_column THEN RAISE NOTICE 'column worker_id already exists, skipping';
+			END;
+		END $$;
+	`
+	if _, err := db.Exec(addColumnLogic); err != nil {
+		log.Printf("⚠️ Warning: Could not add missing columns: %v", err)
+	} else {
+		log.Println("✅ Missing columns checked/added")
+
+		// Create indices only AFTER columns are guaranteed to exist
+		indexLogic := `
+			CREATE INDEX IF NOT EXISTS idx_worker_system_logs_worker_id ON worker_system_logs(worker_id);
+			CREATE INDEX IF NOT EXISTS idx_worker_system_logs_worker_name ON worker_system_logs(worker_name);
+			CREATE INDEX IF NOT EXISTS idx_worker_system_logs_created_at ON worker_system_logs(created_at);
+		`
+		if _, err := db.Exec(indexLogic); err != nil {
+			log.Printf("⚠️ Warning: Could not create indices for worker_system_logs: %v", err)
+		} else {
+			log.Println("✅ Worker system logs indices ensured")
+		}
 	}
 
 	// =====================================================
@@ -588,8 +662,21 @@ func InitCustomSchema() {
 	if _, err := db.Exec(outboxTableSchema); err != nil {
 		log.Printf("⚠️ Warning: Could not create outbox table: %v", err)
 	} else {
-		log.Println("✅ Outbox queue table created successfully")
+		log.Println("✅ Outbox queue table ensured")
 	}
+
+	// Ensure table_id exists in outbox (for older installations)
+	addOutboxColumnLogic := `
+		DO $$ 
+		BEGIN 
+			BEGIN
+				ALTER TABLE outbox ADD COLUMN table_id VARCHAR(100);
+			EXCEPTION
+				WHEN duplicate_column THEN RAISE NOTICE 'column table_id already exists, skipping';
+			END;
+		END $$;
+	`
+	_, _ = db.Exec(addOutboxColumnLogic)
 }
 
 // seedInitialTemplates populates warming_templates with initial conversation templates

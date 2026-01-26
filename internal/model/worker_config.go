@@ -9,16 +9,20 @@ import (
 
 // WorkerConfig represents a configuration for worker blast outbox processing
 type WorkerConfig struct {
-	ID              int       `json:"id"`
-	UserID          int       `json:"user_id"`
-	WorkerName      string    `json:"worker_name"`
-	Circle          string    `json:"circle"`
-	Application     string    `json:"application"`
-	MessageType     string    `json:"message_type"` // "direct" or "group"
-	IntervalSeconds int       `json:"interval_seconds"`
-	Enabled         bool      `json:"enabled"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID                 int            `json:"id"`
+	UserID             int            `json:"user_id"`
+	WorkerName         string         `json:"worker_name"`
+	Circle             string         `json:"circle"`
+	Application        string         `json:"application"`
+	MessageType        string         `json:"message_type"` // "direct" or "group"
+	IntervalSeconds    int            `json:"interval_seconds"`
+	IntervalMaxSeconds int            `json:"interval_max_seconds"`
+	Enabled            bool           `json:"enabled"`
+	AllowMedia         bool           `json:"allow_media"`
+	WebhookURL         sql.NullString `json:"webhook_url"`
+	WebhookSecret      sql.NullString `json:"webhook_secret"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
 }
 
 // GetWorkerConfigs retrieves worker configs based on user permissions
@@ -29,14 +33,14 @@ func GetWorkerConfigs(ctx context.Context, userID int, isAdmin bool) ([]WorkerCo
 	if isAdmin {
 		query = `
 			SELECT id, user_id, worker_name, circle, application, message_type, 
-			       interval_seconds, enabled, created_at, updated_at
+			       interval_seconds, interval_max_seconds, enabled, allow_media, webhook_url, webhook_secret, created_at, updated_at
 			FROM outbox_worker_config
 			ORDER BY created_at DESC
 		`
 	} else {
 		query = `
 			SELECT id, user_id, worker_name, circle, application, message_type,
-			       interval_seconds, enabled, created_at, updated_at
+			       interval_seconds, interval_max_seconds, enabled, allow_media, webhook_url, webhook_secret, created_at, updated_at
 			FROM outbox_worker_config
 			WHERE user_id = $1
 			ORDER BY created_at DESC
@@ -61,7 +65,11 @@ func GetWorkerConfigs(ctx context.Context, userID int, isAdmin bool) ([]WorkerCo
 			&config.Application,
 			&config.MessageType,
 			&config.IntervalSeconds,
+			&config.IntervalMaxSeconds,
 			&config.Enabled,
+			&config.AllowMedia,
+			&config.WebhookURL,
+			&config.WebhookSecret,
 			&config.CreatedAt,
 			&config.UpdatedAt,
 		)
@@ -78,7 +86,7 @@ func GetWorkerConfigs(ctx context.Context, userID int, isAdmin bool) ([]WorkerCo
 func GetWorkerConfigByID(ctx context.Context, id int) (*WorkerConfig, error) {
 	query := `
 		SELECT id, user_id, worker_name, circle, application, message_type,
-		       interval_seconds, enabled, created_at, updated_at
+		       interval_seconds, interval_max_seconds, enabled, allow_media, webhook_url, webhook_secret, created_at, updated_at
 		FROM outbox_worker_config
 		WHERE id = $1
 	`
@@ -92,7 +100,11 @@ func GetWorkerConfigByID(ctx context.Context, id int) (*WorkerConfig, error) {
 		&config.Application,
 		&config.MessageType,
 		&config.IntervalSeconds,
+		&config.IntervalMaxSeconds,
 		&config.Enabled,
+		&config.AllowMedia,
+		&config.WebhookURL,
+		&config.WebhookSecret,
 		&config.CreatedAt,
 		&config.UpdatedAt,
 	)
@@ -111,8 +123,8 @@ func GetWorkerConfigByID(ctx context.Context, id int) (*WorkerConfig, error) {
 func CreateWorkerConfig(ctx context.Context, config *WorkerConfig) error {
 	query := `
 		INSERT INTO outbox_worker_config 
-		(user_id, worker_name, circle, application, message_type, interval_seconds, enabled)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		(user_id, worker_name, circle, application, message_type, interval_seconds, interval_max_seconds, enabled, allow_media, webhook_url, webhook_secret)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id
 	`
 
@@ -125,7 +137,11 @@ func CreateWorkerConfig(ctx context.Context, config *WorkerConfig) error {
 		config.Application,
 		config.MessageType,
 		config.IntervalSeconds,
+		config.IntervalMaxSeconds,
 		config.Enabled,
+		config.AllowMedia,
+		config.WebhookURL,
+		config.WebhookSecret,
 	).Scan(&config.ID)
 
 	return err
@@ -136,8 +152,8 @@ func UpdateWorkerConfig(ctx context.Context, config *WorkerConfig) error {
 	query := `
 		UPDATE outbox_worker_config
 		SET worker_name = $1, circle = $2, application = $3, message_type = $4,
-		    interval_seconds = $5, enabled = $6, updated_at = NOW()
-		WHERE id = $7
+		    interval_seconds = $5, interval_max_seconds = $6, enabled = $7, allow_media = $8, webhook_url = $9, webhook_secret = $10, updated_at = NOW()
+		WHERE id = $11
 	`
 
 	_, err := database.AppDB.ExecContext(
@@ -148,7 +164,11 @@ func UpdateWorkerConfig(ctx context.Context, config *WorkerConfig) error {
 		config.Application,
 		config.MessageType,
 		config.IntervalSeconds,
+		config.IntervalMaxSeconds,
 		config.Enabled,
+		config.AllowMedia,
+		config.WebhookURL,
+		config.WebhookSecret,
 		config.ID,
 	)
 
@@ -177,7 +197,7 @@ func ToggleWorkerConfig(ctx context.Context, id int) error {
 func GetEnabledConfigs(ctx context.Context) ([]WorkerConfig, error) {
 	query := `
 		SELECT id, user_id, worker_name, circle, application, message_type,
-		       interval_seconds, enabled, created_at, updated_at
+		       interval_seconds, interval_max_seconds, enabled, allow_media, webhook_url, webhook_secret, created_at, updated_at
 		FROM outbox_worker_config
 		WHERE enabled = true
 		ORDER BY id ASC
@@ -200,7 +220,11 @@ func GetEnabledConfigs(ctx context.Context) ([]WorkerConfig, error) {
 			&config.Application,
 			&config.MessageType,
 			&config.IntervalSeconds,
+			&config.IntervalMaxSeconds,
 			&config.Enabled,
+			&config.AllowMedia,
+			&config.WebhookURL,
+			&config.WebhookSecret,
 			&config.CreatedAt,
 			&config.UpdatedAt,
 		)
