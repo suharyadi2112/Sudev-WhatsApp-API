@@ -14,20 +14,32 @@ import (
 )
 
 var (
-	WorkerDB     *sql.DB
-	WorkerDriver string // "mysql" or "postgres"
+	ConfigDB     *sql.DB
+	ConfigDriver string // "mysql" or "postgres"
+
+	OutboxDB     *sql.DB
+	OutboxDriver string // "mysql" or "postgres"
 )
 
 func initDB() {
-	dbURL := os.Getenv("OUTBOX_DATABASE_URL")
-	if dbURL == "" {
-		dbURL = os.Getenv("APP_DATABASE_URL")
+	// 1. Initialise ConfigDB (always APP_DATABASE_URL)
+	appDBURL := os.Getenv("APP_DATABASE_URL")
+	if appDBURL == "" {
+		log.Fatal("APP_DATABASE_URL is not set")
 	}
+	ConfigDB, ConfigDriver = connectDB(appDBURL, "Config (Postgres)")
 
-	if dbURL == "" {
-		log.Fatal("Neither OUTBOX_DATABASE_URL nor APP_DATABASE_URL is set")
+	// 2. Initialise OutboxDB (OUTBOX_DATABASE_URL or fallback)
+	outboxDBURL := os.Getenv("OUTBOX_DATABASE_URL")
+	if outboxDBURL == "" {
+		log.Println("OUTBOX_DATABASE_URL not set, falling back to APP_DATABASE_URL for outbox")
+		OutboxDB, OutboxDriver = ConfigDB, ConfigDriver
+	} else {
+		OutboxDB, OutboxDriver = connectDB(outboxDBURL, "Outbox (External)")
 	}
+}
 
+func connectDB(dbURL, label string) (*sql.DB, string) {
 	driver := "postgres"
 	if strings.HasPrefix(dbURL, "mysql://") {
 		driver = "mysql"
@@ -43,16 +55,15 @@ func initDB() {
 
 	db, err := sql.Open(driver, dbURL)
 	if err != nil {
-		log.Fatalf("Failed to open database (%s): %v", driver, err)
+		log.Fatalf("Failed to open %s database (%s): %v", label, driver, err)
 	}
 
 	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database (%s): %v", driver, err)
+		log.Fatalf("Failed to ping %s database (%s): %v", label, driver, err)
 	}
 
-	WorkerDB = db
-	WorkerDriver = driver
-	log.Printf("Successfully connected to Worker Blast Outbox Database (%s)", driver)
+	log.Printf("Successfully connected to %s (%s)", label, driver)
+	return db, driver
 }
 
 func main() {
@@ -63,7 +74,10 @@ func main() {
 
 	// 2. Initialize database
 	initDB()
-	defer WorkerDB.Close()
+	defer ConfigDB.Close()
+	if OutboxDB != ConfigDB {
+		defer OutboxDB.Close()
+	}
 
 	// 3. Worker Configuration
 	apiBaseURL := os.Getenv("OUTBOX_API_BASEURL")
