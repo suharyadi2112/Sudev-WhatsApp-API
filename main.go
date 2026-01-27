@@ -129,13 +129,9 @@ func main() {
 	// main proses.
 	//***************************
 
-	runCreateSchema := false
-	if len(os.Args) > 1 && os.Args[1] == "--createschema" {
-		runCreateSchema = true
-	}
-	if runCreateSchema { // buat/ensure schema dulu
-		helper.InitCustomSchema()
-	}
+	// 6. Auto-Migration (Ensure database schema is up to date)
+	log.Println("Ensuring database schema...")
+	helper.InitCustomSchema()
 
 	// Load all existing devices from database
 	log.Println("Loading existing devices...")
