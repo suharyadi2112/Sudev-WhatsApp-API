@@ -631,6 +631,17 @@ func InitCustomSchema() {
 		}
 	}
 
+	// Expand application column to TEXT for multi-application support
+	expandApplicationColumn := `
+		ALTER TABLE outbox_worker_config 
+		ALTER COLUMN application TYPE TEXT;
+	`
+	if _, err := db.Exec(expandApplicationColumn); err != nil {
+		log.Printf("⚠️ Warning: Could not expand application column: %v", err)
+	} else {
+		log.Println("✅ Application column expanded to TEXT for multi-application support")
+	}
+
 	// =====================================================
 	// OUTBOX QUEUE SCHEMA (For Message Blasting)
 	// =====================================================

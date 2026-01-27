@@ -54,8 +54,14 @@ func (w *WorkerInstance) Start() {
 				sleepSeconds = w.config.IntervalSeconds + rand.Intn(rangeSec)
 			}
 
-			// Sleep for the calculated interval
-			time.Sleep(time.Duration(sleepSeconds) * time.Second)
+			// Interruptible sleep
+			select {
+			case <-w.ctx.Done():
+				log.Printf("[%s] Worker shutting down during sleep...", w.config.WorkerName)
+				return
+			case <-time.After(time.Duration(sleepSeconds) * time.Second):
+				// Just continue to next cycle
+			}
 		}
 	}
 }
@@ -66,8 +72,28 @@ func (w *WorkerInstance) Stop() {
 }
 
 func (w *WorkerInstance) runCycle() {
-	// 1. Claim a pending message for this application (atomicly sets status to 3)
-	filter := fmt.Sprintf("application = '%s'", w.config.Application)
+	// 1. Build Application Filter
+	// Supports:
+	// - "App1" (Single)
+	// - "App1, App2, App3" (Multi - Sequential/Antri)
+	// - "*" (Wildcard - All Applications)
+	var filter string
+	if w.config.Application == "*" || w.config.Application == "" {
+		filter = "" // No application filter, process everything
+	} else if strings.Contains(w.config.Application, ",") {
+		// Multi-application support
+		apps := strings.Split(w.config.Application, ",")
+		var quotedApps []string
+		for _, a := range apps {
+			quotedApps = append(quotedApps, fmt.Sprintf("'%s'", strings.TrimSpace(a)))
+		}
+		filter = fmt.Sprintf("application IN (%s)", strings.Join(quotedApps, ","))
+	} else {
+		// Single application (existing behavior)
+		filter = fmt.Sprintf("application = '%s'", w.config.Application)
+	}
+
+	// 2. Claim a pending message (atomicly sets status to 3)
 	msg, err := ClaimPendingOutbox(w.ctx, filter)
 
 	if err != nil {
