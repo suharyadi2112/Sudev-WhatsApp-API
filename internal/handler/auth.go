@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"gowa-yourself/internal/model"
@@ -394,9 +393,6 @@ var instancesCall int64
 // GET /instances?all=true
 func GetAllInstances(c echo.Context) error {
 
-	id := atomic.AddInt64(&instancesCall, 1)
-	log.Printf("➡️ GetAllInstances CALL #%d at %s", id, time.Now().Format(time.RFC3339Nano))
-
 	showAll := c.QueryParam("all") == "true"
 
 	// Ambil semua instance dari table custom
@@ -434,8 +430,6 @@ func GetAllInstances(c echo.Context) error {
 			}
 		}
 
-		log.Printf("🔍 Processing instance: %s", inst.InstanceID)
-
 		// Convert dari model.Instance ke model.InstanceResp (string primitif)
 		resp := model.ToResponse(inst)
 		// Cek apakah ada session aktif untuk instance ini
@@ -453,9 +447,8 @@ func GetAllInstances(c echo.Context) error {
 		// Tambahkan info apakah session ada di Whatsmeow memory
 		resp.ExistsInWhatsmeow = found
 
-		// ✅ INI YANG SUSPECT - Filter logic
+		// Filter logic
 		if !showAll && !resp.IsConnected {
-			log.Printf("  ⚠️ SKIPPED (not showAll and not connected)")
 			continue
 		}
 		instances = append(instances, resp)
