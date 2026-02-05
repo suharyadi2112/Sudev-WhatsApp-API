@@ -55,6 +55,32 @@ WhatsApp API, WhatsApp Bot, Multi-instance WhatsApp, WhatsApp Automation, Go Wha
 - **Presence heartbeat** — "Active now" status every 5 minutes
 - Real-time status tracking (`online`, `disconnected`, `logged_out`)
 
+### 📨 Worker Blast Outbox System
+- **Standalone worker process** — separate binary for message queue processing
+- **Multi-application support** — one worker can handle multiple applications sequentially
+- **Sequential queuing** — messages processed in FIFO order (by `insertDateTime`)
+- **Atomic message claiming** — `FOR UPDATE SKIP LOCKED` prevents duplicate sends
+- **Wildcard support** — use `*` to process all applications
+- **Dynamic configuration** — workers auto-reload config every 30 seconds
+- **Interruptible sleep** — graceful shutdown during interval delays
+- **Circle-based routing** — route messages to specific instance groups
+- **Webhook integration** — optional status callbacks per worker
+- **Auto-migration** — database schema updates automatically on startup
+
+**Configuration Options:**
+- **Single Application:** `application = "App1"` — dedicated worker for one app
+- **Multi-Application:** `application = "App1, App2, App3"` — sequential processing
+- **Wildcard:** `application = "*"` — process all pending messages
+
+**How It Works:**
+1. Worker polls database for pending messages (`status = 0`)
+2. Atomically claims one message (sets `status = 3`)
+3. Fetches available instances from configured circle
+4. Sends message via WhatsApp API
+5. Updates status to success (`1`) or failed (`2`)
+6. Sleeps for configured interval (with random jitter if `interval_max` set)
+7. Repeats cycle
+
 ### API Reference
 
 ```bash
@@ -121,7 +147,8 @@ Configure these variables in your `.env` file to customize the application behav
 | Variable | Description | Default | Example |
 | :--- | :--- | :--- | :--- |
 | `DATABASE_URL` | PostgreSQL URL for whatsmeow session storage | - | `postgres://user:pass@localhost:5432/db` |
-| `APP_DATABASE_URL` | PostgreSQL URL for application data | - | `postgres://user:pass@localhost:5432/app_db` |
+| `APP_DATABASE_URL` | PostgreSQL URL for application data (worker config, logs) | - | `postgres://user:pass@localhost:5432/app_db` |
+| `OUTBOX_DATABASE_URL` | MySQL/PostgreSQL URL for outbox messages (optional, falls back to APP_DATABASE_URL) | - | `mysql://user:pass@localhost:3306/outbox_db` |
 | `JWT_SECRET` | Secret key for JWT authentication | - | `YOUR_JWT_SECRET` |
 | `APP_LOGIN_USERNAME` | Username for dashboard/API login | - | `sudevwa` |
 | `APP_LOGIN_PASSWORD` | Password for dashboard/API login | - | `5ud3vw4` |
@@ -173,6 +200,16 @@ Configure these variables in your `.env` file to customize the application behav
 | `AI_CONVERSATION_HISTORY_LIMIT` | Number of previous messages for context | `10` | `20` |
 | `AI_DEFAULT_TEMPERATURE` | AI response randomness (0.0 to 1.0) | `0.7` | `0.5` |
 | `AI_DEFAULT_MAX_TOKENS` | Max tokens for AI response | `150` | `300` |
+
+### 📨 Worker Blast Outbox
+| Variable | Description | Default | Example |
+| :--- | :--- | :--- | :--- |
+| `OUTBOX_API_BASEURL` | Base URL for WhatsApp API (used by worker) | `http://localhost:2121` | `https://api.example.com` |
+| `OUTBOX_API_USER` | Username for worker API authentication | - | `worker_user` |
+| `OUTBOX_API_PASS` | Password for worker API authentication | - | `worker_pass` |
+
+**Note:** Worker process (`./worker`) runs as a standalone binary and communicates with the main API to send messages. It reads configurations from `APP_DATABASE_URL` and processes messages from `OUTBOX_DATABASE_URL` (or falls back to `APP_DATABASE_URL` if not set).
+
 If this variable is not set, or set to anything other than `true`, webhooks will not be sent.
 
 ### Configure Webhook per Instance
@@ -221,6 +258,84 @@ Webhook Payload:
 }
 ```
 
+## 🚀 Deployment & Build
+
+### Building the Application
+
+**For Linux (Ubuntu):**
+```bash
+# Build API Server
+go build -o sudevwa main.go
+
+# Build Worker
+go build -o worker ./cmd/worker/
+
+# Make executable
+chmod +x sudevwa worker
+```
+
+**For Windows:**
+```powershell
+# Build API Server
+go build -o sudevwa.exe main.go
+
+# Build Worker
+go build -o worker.exe ./cmd/worker/
+```
+
+**Cross-compile from Windows to Linux:**
+```powershell
+# Build for Linux
+$env:GOOS="linux"; $env:GOARCH="amd64"; go build -o sudevwa main.go
+$env:GOOS="linux"; $env:GOARCH="amd64"; go build -o worker ./cmd/worker/
+```
+
+### Running with PM2 (Production)
+
+Create `ecosystem.config.js`:
+```javascript
+module.exports = {
+    apps: [
+        {
+            name: "sudevwa-api",
+            script: "./sudevwa",
+            watch: false,
+            env_file: ".env",
+            instances: 1,
+            exec_mode: "fork",
+            max_memory_restart: "500M",
+            autorestart: true,
+            time: true
+        },
+        {
+            name: "sudevwa-worker",
+            script: "./worker",
+            watch: false,
+            env_file: ".env",
+            instances: 1,
+            exec_mode: "fork",
+            max_memory_restart: "500M",
+            autorestart: true,
+            time: true
+        }
+    ]
+}
+```
+
+**Start services:**
+```bash
+pm2 start ecosystem.config.js
+pm2 save
+pm2 startup
+```
+
+### Auto-Migration
+The application automatically updates database schema on startup. No manual migration commands needed. The system will:
+- Create missing tables
+- Add missing columns
+- Expand column types (e.g., `application` VARCHAR → TEXT)
+- Preserve existing data and custom columns
+
 ## ⚠️ Disclaimer
 For educational/research purposes only. Use at your own risk.
 
@@ -251,9 +366,9 @@ Here are some previews of the SUDEVWA interface.
 
 | Feature | Preview |
 | :--- | :--- |
-| **Login / Scan QR** | <img width="1902" height="914" alt="image" src="https://github.com/user-attachments/assets/d1c5f823-5eb3-4a95-9dcd-4d58eb7629b6" /> |
-| **Main Dashboard** | <img width="1891" height="908" alt="image" src="https://github.com/user-attachments/assets/a0bb20ef-bdfa-4a5d-9f0b-c61fc5d7f8fe" />|
-| **Instances Management** | <img width="1881" height="825" alt="image" src="https://github.com/user-attachments/assets/4ec19e75-1782-4a8a-b0aa-aa52f29dceef" />|
+| **Login / Scan QR** | <img width="1898" height="908" alt="image" src="https://github.com/user-attachments/assets/eb800f68-34be-4485-8fe7-f3ca1c58dd39" />|
+| **Main Dashboard** | <img width="1892" height="913" alt="image" src="https://github.com/user-attachments/assets/163b9725-9abe-42ae-b222-3dbc56f42b72" />|
+| **Instances Management** | <img width="1876" height="913" alt="image" src="https://github.com/user-attachments/assets/99e0a93a-4dad-4d86-8acf-33b18c07780a" />|
 | **Add Instances** | <img width="955" height="487" alt="image" src="https://github.com/user-attachments/assets/ecfafa8c-26af-444a-aed0-948f14ab84ec" />|
 | **Detail Instances** | <img width="658" height="707" alt="image" src="https://github.com/user-attachments/assets/3ef0056d-9f59-494c-b340-aaff98f20551" />|
 | **Edit Instances** | <img width="537" height="768" alt="image" src="https://github.com/user-attachments/assets/0658a838-e3e6-4983-95de-cfed90838d17" />|
@@ -264,4 +379,5 @@ Here are some previews of the SUDEVWA interface.
 | **Add Warming Room** | <img width="1446" height="812" alt="image" src="https://github.com/user-attachments/assets/8a05d3a4-be9a-490d-844d-27b6a89ebfb1" />|
 | **Number Checker** | <img width="1878" height="770" alt="image" src="https://github.com/user-attachments/assets/19b6eda2-dd89-4244-b1df-90dfc5d95bea" />|
 | **Api Documentation** | <img width="1863" height="867" alt="image" src="https://github.com/user-attachments/assets/689b81a2-907e-4282-b74f-7ac12aa8eeb4" />|
+
 
