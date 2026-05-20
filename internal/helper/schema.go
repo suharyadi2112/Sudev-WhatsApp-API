@@ -688,6 +688,71 @@ func InitCustomSchema() {
 		END $$;
 	`
 	_, _ = db.Exec(addOutboxColumnLogic)
+
+	// =====================================================
+	// SIM ATTENDANCE SCHEMA
+	// =====================================================
+	attendanceSchema := `
+		CREATE TABLE IF NOT EXISTS sim_attendance (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			attendance_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+			phone_number VARCHAR(20),
+			sim_label VARCHAR(100),
+			attendance_type VARCHAR(50) NOT NULL,
+			status VARCHAR(50),
+			title VARCHAR(255),
+			notes TEXT,
+			metadata JSONB,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			CONSTRAINT unique_user_attendance UNIQUE (user_id, attendance_date, attendance_type, phone_number)
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_sim_attendance_user ON sim_attendance(user_id);
+		CREATE INDEX IF NOT EXISTS idx_sim_attendance_date ON sim_attendance(attendance_date);
+		CREATE INDEX IF NOT EXISTS idx_sim_attendance_type ON sim_attendance(attendance_type);
+
+		COMMENT ON TABLE sim_attendance IS 'Daily attendance tracking for SIM cards and maintenance activities';
+	`
+	if _, err := db.Exec(attendanceSchema); err != nil {
+		log.Printf("⚠️ Warning: Could not create sim_attendance table: %v", err)
+	} else {
+		log.Println("✅ SIM attendance table ensured")
+
+		// Migration: Alter column type for existing installations
+		migrateAttendanceDate := `
+			ALTER TABLE sim_attendance 
+			ALTER COLUMN attendance_date TYPE TIMESTAMP WITH TIME ZONE;
+		`
+		if _, err := db.Exec(migrateAttendanceDate); err != nil {
+			log.Printf("⚠️ Warning: Could not migrate attendance_date to TIMESTAMP: %v", err)
+		} else {
+			log.Println("✅ SIM attendance_date upgraded to TIMESTAMP WITH TIME ZONE")
+		}
+	}
+
+	// =====================================================
+	// INSTANCE MESSAGE STATS SCHEMA
+	// =====================================================
+	messageStatsSchema := `
+		CREATE TABLE IF NOT EXISTS instance_message_stats (
+			id SERIAL PRIMARY KEY,
+			instance_id VARCHAR(50) NOT NULL REFERENCES instances(instance_id) ON DELETE CASCADE,
+			stat_date DATE NOT NULL DEFAULT CURRENT_DATE,
+			message_count INTEGER DEFAULT 0,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			CONSTRAINT unique_instance_date UNIQUE (instance_id, stat_date)
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_msg_stats_instance ON instance_message_stats(instance_id);
+		CREATE INDEX IF NOT EXISTS idx_msg_stats_date ON instance_message_stats(stat_date);
+	`
+	if _, err := db.Exec(messageStatsSchema); err != nil {
+		log.Printf("⚠️ Warning: Could not create instance_message_stats table: %v", err)
+	} else {
+		log.Println("✅ Instance message stats table ensured")
+	}
 }
 
 // seedInitialTemplates populates warming_templates with initial conversation templates

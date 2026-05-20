@@ -144,6 +144,9 @@ func SendGroupMessage(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to send message", "SEND_FAILED", err.Error())
 	}
+	// Increment daily message count
+	_ = model.IncrementMessageCount(instanceID)
+
 
 	return SuccessResponse(c, 200, "Message sent to group", map[string]interface{}{
 		"messageId": resp.ID,
@@ -264,6 +267,9 @@ func SendGroupMedia(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to send media", "SEND_FAILED", err.Error())
 	}
+	// Increment daily message count
+	_ = model.IncrementMessageCount(instanceID)
+
 
 	return SuccessResponse(c, 200, "Media sent to group", map[string]interface{}{
 		"messageId": resp.ID,
@@ -385,6 +391,9 @@ func SendGroupMediaURL(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to send media", "SEND_FAILED", err.Error())
 	}
+	// Increment daily message count
+	_ = model.IncrementMessageCount(instanceID)
+
 
 	return SuccessResponse(c, 200, "Media sent to group", map[string]interface{}{
 		"messageId": resp.ID,
@@ -550,6 +559,9 @@ func SendGroupMessageByNumber(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to send message", "SEND_FAILED", err.Error())
 	}
+	// Increment daily message count
+	_ = model.IncrementMessageCount(inst.InstanceID)
+
 
 	return SuccessResponse(c, 200, "Message sent to group", map[string]interface{}{
 		"from":      phoneNumber,
@@ -689,6 +701,9 @@ func SendGroupMediaByNumber(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to send media", "SEND_FAILED", err.Error())
 	}
+	// Increment daily message count
+	_ = model.IncrementMessageCount(inst.InstanceID)
+
 
 	return SuccessResponse(c, 200, "Media sent to group", map[string]interface{}{
 		"from":      phoneNumber,
@@ -829,6 +844,9 @@ func SendGroupMediaURLByNumber(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to send media", "SEND_FAILED", err.Error())
 	}
+	// Increment daily message count
+	_ = model.IncrementMessageCount(inst.InstanceID)
+
 
 	return SuccessResponse(c, 200, "Media sent to group", map[string]interface{}{
 		"from":      phoneNumber,

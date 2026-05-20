@@ -159,6 +159,9 @@ func SendMediaFile(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to send media", "SEND_FAILED", err.Error())
 	}
+	// Increment daily message count
+	_ = model.IncrementMessageCount(instanceID)
+
 
 	// 14. SUCCESS RESPONSE
 	return SuccessResponse(c, 200, "Media sent successfully", map[string]interface{}{
@@ -302,6 +305,9 @@ func SendMediaURL(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to send media", "SEND_FAILED", err.Error())
 	}
+	// Increment daily message count
+	_ = model.IncrementMessageCount(instanceID)
+
 
 	// 14. SUCCESS RESPONSE
 	return SuccessResponse(c, 200, "Media sent successfully", map[string]interface{}{
@@ -447,6 +453,8 @@ func SendMediaURLByNumber(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to send media", "SEND_FAILED", err.Error())
 	}
+	// Increment daily message count
+	_ = model.IncrementMessageCount(inst.InstanceID)
 
 	return SuccessResponse(c, 200, "Media sent successfully", map[string]interface{}{
 		"from":      phoneNumber,
@@ -607,6 +615,8 @@ func SendMediaFileByNumber(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to send media", "SEND_FAILED", err.Error())
 	}
+	// Increment daily message count
+	_ = model.IncrementMessageCount(inst.InstanceID)
 
 	// 15. SUCCESS RESPONSE
 	return SuccessResponse(c, 200, "Media sent successfully", map[string]interface{}{
