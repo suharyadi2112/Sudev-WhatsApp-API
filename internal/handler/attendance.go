@@ -61,6 +61,10 @@ func GetAttendances(c echo.Context) error {
 	attendanceType := c.QueryParam("attendance_type")
 	phoneNumber := c.QueryParam("phone_number")
 	simLabel := c.QueryParam("sim_label")
+	instanceID := c.QueryParam("instance_id")
+	if instanceID == "" {
+		instanceID = c.QueryParam("instanceId")
+	}
 
 	// Validate date format and validity
 	if startDate != "" {
@@ -75,7 +79,7 @@ func GetAttendances(c echo.Context) error {
 		}
 	}
 
-	attendances, err := model.GetAttendances(userID, isAdmin, startDate, endDate, attendanceType, phoneNumber, simLabel)
+	attendances, err := model.GetAttendances(userID, isAdmin, startDate, endDate, attendanceType, phoneNumber, simLabel, instanceID)
 	if err != nil {
 		return ErrorResponse(c, http.StatusInternalServerError, "Failed to get attendances", "GET_FAILED", err.Error())
 	}

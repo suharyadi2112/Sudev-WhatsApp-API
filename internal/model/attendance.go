@@ -21,6 +21,7 @@ type SimAttendance struct {
 	Metadata       string    `json:"metadata,omitempty"`
 	CreatedAt      time.Time `json:"createdAt"`
 	UpdatedAt      time.Time `json:"updatedAt"`
+	InstanceID     string    `json:"instanceId,omitempty"`
 }
 
 // CreateAttendanceRequest for creating new attendance
@@ -110,6 +111,8 @@ func CreateAttendance(userID int64, req *CreateAttendanceRequest) (*SimAttendanc
 
 	if phoneNumber.Valid {
 		attendance.PhoneNumber = phoneNumber.String
+		// Fetch matching instance_id for convenience in response
+		_ = database.AppDB.QueryRow("SELECT instance_id FROM instances WHERE phone_number = $1 LIMIT 1", phoneNumber.String).Scan(&attendance.InstanceID)
 	}
 	if simLabel.Valid {
 		attendance.SimLabel = simLabel.String
@@ -127,20 +130,22 @@ func CreateAttendance(userID int64, req *CreateAttendanceRequest) (*SimAttendanc
 	return &attendance, nil
 }
 
-// GetAttendances retrieves attendance records with optional filters
-func GetAttendances(userID int64, isAdmin bool, startDate, endDate, attendanceType, phoneNumber, simLabel string) ([]SimAttendance, error) {
+// GetAttendances retrieves attendance records with optional filters including instanceID
+func GetAttendances(userID int64, isAdmin bool, startDate, endDate, attendanceType, phoneNumber, simLabel, instanceID string) ([]SimAttendance, error) {
 	var args []interface{}
 	argCount := 0
 
 	query := `
-		SELECT id, user_id, attendance_date, phone_number, sim_label, 
-		       attendance_type, status, title, notes, metadata, created_at, updated_at
-		FROM sim_attendance
+		SELECT s.id, s.user_id, s.attendance_date, s.phone_number, s.sim_label, 
+		       s.attendance_type, s.status, s.title, s.notes, s.metadata, s.created_at, s.updated_at,
+		       COALESCE(i.instance_id, '') AS instance_id
+		FROM sim_attendance s
+		LEFT JOIN instances i ON s.phone_number = i.phone_number
 	`
 
 	if !isAdmin {
 		argCount++
-		query += ` WHERE user_id = $` + strconv.Itoa(argCount)
+		query += ` WHERE s.user_id = $` + strconv.Itoa(argCount)
 		args = append(args, userID)
 	} else {
 		query += ` WHERE 1=1`
@@ -148,7 +153,7 @@ func GetAttendances(userID int64, isAdmin bool, startDate, endDate, attendanceTy
 
 	if startDate != "" {
 		argCount++
-		query += ` AND attendance_date >= $` + strconv.Itoa(argCount)
+		query += ` AND s.attendance_date >= $` + strconv.Itoa(argCount)
 		if len(startDate) == 10 {
 			args = append(args, startDate+" 00:00:00")
 		} else {
@@ -158,7 +163,7 @@ func GetAttendances(userID int64, isAdmin bool, startDate, endDate, attendanceTy
 
 	if endDate != "" {
 		argCount++
-		query += ` AND attendance_date <= $` + strconv.Itoa(argCount)
+		query += ` AND s.attendance_date <= $` + strconv.Itoa(argCount)
 		if len(endDate) == 10 {
 			args = append(args, endDate+" 23:59:59")
 		} else {
@@ -168,23 +173,29 @@ func GetAttendances(userID int64, isAdmin bool, startDate, endDate, attendanceTy
 
 	if attendanceType != "" {
 		argCount++
-		query += ` AND attendance_type = $` + strconv.Itoa(argCount)
+		query += ` AND s.attendance_type = $` + strconv.Itoa(argCount)
 		args = append(args, attendanceType)
 	}
 
 	if phoneNumber != "" {
 		argCount++
-		query += ` AND phone_number = $` + strconv.Itoa(argCount)
+		query += ` AND s.phone_number = $` + strconv.Itoa(argCount)
 		args = append(args, phoneNumber)
 	}
 
 	if simLabel != "" {
 		argCount++
-		query += ` AND sim_label = $` + strconv.Itoa(argCount)
+		query += ` AND s.sim_label = $` + strconv.Itoa(argCount)
 		args = append(args, simLabel)
 	}
 
-	query += ` ORDER BY attendance_date DESC, created_at DESC`
+	if instanceID != "" {
+		argCount++
+		query += ` AND i.instance_id = $` + strconv.Itoa(argCount)
+		args = append(args, instanceID)
+	}
+
+	query += ` ORDER BY s.attendance_date DESC, s.created_at DESC`
 
 	rows, err := database.AppDB.Query(query, args...)
 	if err != nil {
@@ -197,6 +208,7 @@ func GetAttendances(userID int64, isAdmin bool, startDate, endDate, attendanceTy
 	for rows.Next() {
 		var att SimAttendance
 		var phoneNumber, simLabel, status, notes, metadata sql.NullString
+		var dbInstanceID sql.NullString
 
 		err := rows.Scan(
 			&att.ID,
@@ -211,6 +223,7 @@ func GetAttendances(userID int64, isAdmin bool, startDate, endDate, attendanceTy
 			&metadata,
 			&att.CreatedAt,
 			&att.UpdatedAt,
+			&dbInstanceID,
 		)
 
 		if err != nil {
@@ -231,6 +244,9 @@ func GetAttendances(userID int64, isAdmin bool, startDate, endDate, attendanceTy
 		}
 		if metadata.Valid {
 			att.Metadata = metadata.String
+		}
+		if dbInstanceID.Valid {
+			att.InstanceID = dbInstanceID.String
 		}
 
 		attendances = append(attendances, att)
