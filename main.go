@@ -280,8 +280,21 @@ func main() {
 
 	// Get all instances (requires authentication, filtered by user role)
 	api.GET("/instances", handler.GetAllInstances) // JWT already applied to 'api' group
+
+	// Global Timeline
+	api.GET("/timeline", handler.GetGlobalTimeline)
+
 	// update instance fields (used, keterangan)
 	api.PATCH("/instances/:instanceId", handler.UpdateInstanceFields, customMiddleware.RequireInstanceAccess())
+
+	// Timeline route
+	api.GET("/instances/:instanceId/timeline", handler.GetInstanceTimeline, customMiddleware.RequireInstanceAccess())
+
+	// Attendance routes
+	api.POST("/attendance", handler.CreateAttendance)
+	api.GET("/attendance", handler.GetAttendances)
+	api.PATCH("/attendance/:id", handler.UpdateAttendance)
+	api.DELETE("/attendance/:id", handler.DeleteAttendance)
 
 	// Message routes by instance id
 	api.POST("/send/:instanceId", handler.SendMessage, customMiddleware.RequireInstanceAccess())

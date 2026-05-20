@@ -132,6 +132,9 @@ func SendMessage(c echo.Context) error {
 		return ErrorResponse(c, 500, "Failed to send message", "SEND_FAILED", err.Error())
 	}
 
+	// Increment daily message count
+	_ = model.IncrementMessageCount(instanceID)
+
 	return SuccessResponse(c, 200, "Message sent successfully", map[string]interface{}{
 		"messageId": resp.ID,
 		"timestamp": resp.Timestamp.Unix(),
@@ -267,6 +270,9 @@ func SendMessageByNumber(c echo.Context) error {
 	if err != nil {
 		return ErrorResponse(c, 500, "Failed to send message", "SEND_FAILED", err.Error())
 	}
+
+	// Increment daily message count
+	_ = model.IncrementMessageCount(inst.InstanceID)
 
 	return SuccessResponse(c, 200, "Message sent successfully", map[string]interface{}{
 		"messageId": resp.ID,
