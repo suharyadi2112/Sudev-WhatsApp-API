@@ -580,3 +580,232 @@ func UpdateInstanceFields(instanceID string, req *UpdateInstanceFieldsRequest) e
 
 	return nil
 }
+
+// TimelineEvent represents a single event in instance timeline
+type TimelineEvent struct {
+	EventDate   time.Time `json:"eventDate"`
+	EventType   string    `json:"eventType"`
+	Description string    `json:"description"`
+	Metadata    string    `json:"metadata,omitempty"`
+	UserID      *int64    `json:"userId,omitempty"`
+}
+
+// GetInstanceTimeline retrieves timeline events for an instance from multiple tables
+func GetInstanceTimeline(instanceID string, startDate, endDate string) ([]TimelineEvent, error) {
+	query := `
+		-- Instance creation
+		SELECT created_at as event_date, 'INSTANCE_CREATED' as event_type, 
+		       'Instance created' as description, NULL as metadata, created_by as user_id
+		FROM instances 
+		WHERE instance_id = $1
+
+		UNION ALL
+
+		-- User assignments
+		SELECT ui.created_at, 'USER_ASSIGNED',
+		       'User assigned to instance' as description,
+		       NULL as metadata, ui.user_id
+		FROM user_instances ui
+		WHERE ui.instance_id = $1
+
+		UNION ALL
+
+		-- Warming rooms (as sender)
+		SELECT wr.created_at, 'WARMING_ROOM_JOINED',
+		       'Joined warming room: ' || wr.name || ' (as sender)' as description,
+		       json_build_object('roomId', wr.id, 'roomName', wr.name, 'role', 'sender', 'roomType', wr.room_type)::text as metadata,
+		       NULL as user_id
+		FROM warming_rooms wr
+		WHERE wr.sender_instance_id = $1
+
+		UNION ALL
+
+		-- Warming rooms (as receiver)
+		SELECT wr.created_at, 'WARMING_ROOM_JOINED',
+		       'Joined warming room: ' || wr.name || ' (as receiver)' as description,
+		       json_build_object('roomId', wr.id, 'roomName', wr.name, 'role', 'receiver', 'roomType', wr.room_type)::text as metadata,
+		       NULL as user_id
+		FROM warming_rooms wr
+		WHERE wr.receiver_instance_id = $1
+
+		UNION ALL
+
+		-- Warming activities
+		SELECT wl.executed_at, 'WARMING_ACTIVITY',
+		       'Warming message in room: ' || wr.name as description,
+		       json_build_object('roomId', wr.id, 'roomName', wr.name, 'status', wl.status)::text as metadata,
+		       NULL as user_id
+		FROM warming_logs wl
+		JOIN warming_rooms wr ON wl.room_id = wr.id
+		WHERE wr.sender_instance_id = $1 OR wr.receiver_instance_id = $1
+
+		UNION ALL
+
+		-- Worker configurations (by circle)
+		SELECT wc.created_at, 'WORKER_CREATED',
+		       'Worker "' || wc.worker_name || '" created for circle: ' || wc.circle as description,
+		       json_build_object('workerId', wc.id, 'workerName', wc.worker_name, 'circle', wc.circle, 'application', wc.application, 'enabled', wc.enabled)::text as metadata,
+		       wc.user_id
+		FROM outbox_worker_config wc
+		JOIN instances i ON i.circle = wc.circle
+		WHERE i.instance_id = $1
+
+		UNION ALL
+
+		-- Audit logs
+		SELECT al.created_at, 'AUDIT_' || UPPER(al.action),
+		       al.action || ' on instance' as description,
+		       al.details::text as metadata,
+		       al.user_id
+		FROM audit_logs al
+		WHERE al.resource_type = 'instance' AND al.resource_id = $1
+
+		UNION ALL
+
+		-- Message Stats
+		SELECT stat_date::timestamp with time zone as event_date, 'MESSAGE_STATS',
+		       'Messages sent: ' || message_count as description,
+		       json_build_object('count', message_count)::text as metadata,
+		       NULL as user_id
+		FROM instance_message_stats
+		WHERE instance_id = $1
+
+		ORDER BY event_date DESC
+		LIMIT 500
+	`
+
+	var events []TimelineEvent
+	rows, err := database.AppDB.Query(query, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var event TimelineEvent
+		var metadata sql.NullString
+		var userID sql.NullInt64
+
+		err := rows.Scan(&event.EventDate, &event.EventType, &event.Description, &metadata, &userID)
+		if err != nil {
+			return nil, err
+		}
+
+		if metadata.Valid {
+			event.Metadata = metadata.String
+		}
+		if userID.Valid {
+			event.UserID = &userID.Int64
+		}
+
+		events = append(events, event)
+	}
+
+	return events, nil
+}
+
+// GetGlobalTimeline retrieves timeline events for all instances of a user plus attendance
+// Admin role sees all data, regular user only sees their own.
+func GetGlobalTimeline(userID int64, role string, startDate, endDate string) ([]TimelineEvent, error) {
+	isAdmin := role == "admin"
+
+	query := `
+		WITH user_instance_ids AS (
+			SELECT instance_id FROM user_instances WHERE user_id = $1 OR $2 = true
+		)
+		-- Instance lifecycle
+		SELECT i.created_at as event_date, 'INSTANCE_CREATED' as event_type, 
+		       'Instance created: ' || i.instance_id as description, 
+		       json_build_object('instanceId', i.instance_id)::text as metadata, 
+		       i.created_by as user_id
+		FROM instances i
+		WHERE $2 = true OR i.instance_id IN (SELECT instance_id FROM user_instance_ids)
+
+		UNION ALL
+
+		-- Warming rooms (participation)
+		SELECT wr.created_at, 'WARMING_ROOM_JOINED',
+		       'Joined warming room: ' || wr.name || ' (Participation)' as description,
+		       json_build_object('roomId', wr.id, 'roomName', wr.name, 'roomType', wr.room_type)::text as metadata,
+		       NULL as user_id
+		FROM warming_rooms wr
+		WHERE $2 = true 
+		   OR wr.sender_instance_id IN (SELECT instance_id FROM user_instance_ids)
+		   OR wr.receiver_instance_id IN (SELECT instance_id FROM user_instance_ids)
+
+		UNION ALL
+
+		-- Warming activities
+		SELECT wl.executed_at, 'WARMING_ACTIVITY',
+		       'Warming message in room: ' || wr.name as description,
+		       json_build_object('roomId', wr.id, 'roomName', wr.name, 'status', wl.status)::text as metadata,
+		       NULL as user_id
+		FROM warming_logs wl
+		JOIN warming_rooms wr ON wl.room_id = wr.id
+		WHERE $2 = true 
+		   OR wl.sender_instance_id IN (SELECT instance_id FROM user_instance_ids)
+		   OR wl.receiver_instance_id IN (SELECT instance_id FROM user_instance_ids)
+
+		UNION ALL
+
+		-- SIM Attendance
+		SELECT attendance_date::timestamp with time zone, 'SIM_ATTENDANCE',
+		       title as description,
+		       json_build_object('simLabel', sim_label, 'phoneNumber', phone_number, 'status', status, 'notes', notes)::text as metadata,
+		       user_id
+		FROM sim_attendance
+		WHERE $2 = true OR user_id = $1
+
+		UNION ALL
+
+		-- Audit logs
+		SELECT al.created_at, 'AUDIT_' || UPPER(al.action),
+		       al.action || ' on ' || al.resource_type as description,
+		       al.details::text as metadata,
+		       al.user_id
+		FROM audit_logs al
+		WHERE $2 = true OR al.user_id = $1
+
+		UNION ALL
+
+		-- Message Stats
+		SELECT ms.stat_date::timestamp with time zone as event_date, 'MESSAGE_STATS',
+		       'Messages sent: ' || ms.message_count || ' (Instance: ' || ms.instance_id || ')' as description,
+		       json_build_object('instanceId', ms.instance_id, 'count', ms.message_count)::text as metadata,
+		       NULL as user_id
+		FROM instance_message_stats ms
+		WHERE $2 = true OR ms.instance_id IN (SELECT instance_id FROM user_instance_ids)
+
+		ORDER BY event_date DESC
+		LIMIT 1000
+	`
+
+	var events []TimelineEvent
+	rows, err := database.AppDB.Query(query, userID, isAdmin)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var event TimelineEvent
+		var metadata sql.NullString
+		var uID sql.NullInt64
+
+		err := rows.Scan(&event.EventDate, &event.EventType, &event.Description, &metadata, &uID)
+		if err != nil {
+			return nil, err
+		}
+
+		if metadata.Valid {
+			event.Metadata = metadata.String
+		}
+		if uID.Valid {
+			event.UserID = &uID.Int64
+		}
+
+		events = append(events, event)
+	}
+
+	return events, nil
+}
