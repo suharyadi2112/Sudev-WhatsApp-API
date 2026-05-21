@@ -4,6 +4,12 @@
 
 REST API for **WhatsApp Web automation**, **multi-instance management**, and **real-time messaging** built with **Go (Golang)**, **Echo framework**, and **whatsmeow library**.
 
+## Note
+
+> This application is separated from the frontend system.  
+> This repository contains backend services only.  
+> If you need the frontend application/package, please contact the administrator.
+
 ## 🔍 Keywords
 WhatsApp API, WhatsApp Bot, Multi-instance WhatsApp, WhatsApp Automation, Go WhatsApp, Whatsmeow, WebSocket Real-time, REST API, PostgreSQL, Echo Framework
 
@@ -66,6 +72,12 @@ WhatsApp API, WhatsApp Bot, Multi-instance WhatsApp, WhatsApp Automation, Go Wha
 - **Circle-based routing** — route messages to specific instance groups
 - **Webhook integration** — optional status callbacks per worker
 - **Auto-migration** — database schema updates automatically on startup
+
+### Timeline and Attandance With Calendar
+- Record every WhatsApp instance activity in a structured timeline log.
+- Track user attendance and check-ins automatically like a digital attendance system.
+- Monitor daily activity history and attendance status in real-time.
+
 
 **Configuration Options:**
 - **Single Application:** `application = "App1"` — dedicated worker for one app
@@ -374,10 +386,16 @@ Here are some previews of the SUDEVWA interface.
 | **Edit Instances** | <img width="537" height="768" alt="image" src="https://github.com/user-attachments/assets/0658a838-e3e6-4983-95de-cfed90838d17" />|
 | **QR Code Instances** | <img width="1301" height="511" alt="image" src="https://github.com/user-attachments/assets/61eb147b-c99d-45c2-b1d9-1cf58d91581c" />|
 | **Disconnect Instances** | <img width="862" height="458" alt="image" src="https://github.com/user-attachments/assets/3a6bd749-a801-41da-9ce7-41d8a664ccdc" />|
+| **Dashboard Worker** | <img width="1848" height="864" alt="image" src="https://github.com/user-attachments/assets/3691482c-6131-4231-a9ec-8c5ec5c9ce8f" />|
+| **Add Worker** | <img width="1336" height="897" alt="image" src="https://github.com/user-attachments/assets/27670199-c0a8-4eb6-87fd-be9f010173e4" />|
+| **Calendar Timeline and Attandance** | <img width="1870" height="885" alt="image" src="https://github.com/user-attachments/assets/34e07002-f0a7-4fa3-9b3d-1e215bdda29d" />|
 | **Message Room** | <img width="1881" height="849" alt="image" src="https://github.com/user-attachments/assets/d01bd6ed-1558-4629-951d-b4b5032d46f5" />|
 | **Message Room Group** | <img width="1884" height="876" alt="image" src="https://github.com/user-attachments/assets/6d795feb-5fd2-40c6-9e98-e55f3ee72896" />|
 | **Add Warming Room** | <img width="1446" height="812" alt="image" src="https://github.com/user-attachments/assets/8a05d3a4-be9a-490d-844d-27b6a89ebfb1" />|
 | **Number Checker** | <img width="1878" height="770" alt="image" src="https://github.com/user-attachments/assets/19b6eda2-dd89-4244-b1df-90dfc5d95bea" />|
 | **Api Documentation** | <img width="1863" height="867" alt="image" src="https://github.com/user-attachments/assets/689b81a2-907e-4282-b74f-7ac12aa8eeb4" />|
+
+
+
 
 
