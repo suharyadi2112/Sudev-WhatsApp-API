@@ -348,6 +348,12 @@ func main() {
 	blastOutbox.PUT("/configs/:id", handler.UpdateWorkerConfig)
 	blastOutbox.DELETE("/configs/:id", handler.DeleteWorkerConfig)
 	blastOutbox.POST("/configs/:id/toggle", handler.ToggleWorkerConfig)
+	blastOutbox.POST("/queue", handler.CreateOutboxQueue)
+	blastOutbox.POST("/queue/bulk-status", handler.BulkUpdateOutboxStatusHandler)
+	blastOutbox.POST("/import-excel", handler.ImportOutboxExcel)
+	blastOutbox.GET("/template-excel", handler.DownloadOutboxExcelTemplate)
+	blastOutbox.GET("/queue", handler.GetOutboxQueue)
+	blastOutbox.GET("/queue/:id", handler.GetOutboxByID)
 
 	// Helper endpoints for frontend
 	blastOutbox.GET("/available-circles", handler.GetAvailableCircles)
