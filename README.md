@@ -78,6 +78,12 @@ WhatsApp API, WhatsApp Bot, Multi-instance WhatsApp, WhatsApp Automation, Go Wha
 - Track user attendance and check-ins automatically like a digital attendance system.
 - Monitor daily activity history and attendance status in real-time.
 
+### Broadcast Outbox Enhancements
+**Dual Database Outbox Support: Flexible outbox table configuration for PostgreSQL or external MySQL via OUTBOX_DATABASE_URL in .env.**
+- Excel Template Download
+- Mass Broadcast via Excel Import
+- Bulk Queue Status Management
+
 
 **Configuration Options:**
 - **Single Application:** `application = "App1"` — dedicated worker for one app
@@ -393,6 +399,9 @@ Here are some previews of the SUDEVWA interface.
 | **Message Room Group** | <img width="1884" height="876" alt="image" src="https://github.com/user-attachments/assets/6d795feb-5fd2-40c6-9e98-e55f3ee72896" />|
 | **Add Warming Room** | <img width="1446" height="812" alt="image" src="https://github.com/user-attachments/assets/8a05d3a4-be9a-490d-844d-27b6a89ebfb1" />|
 | **Number Checker** | <img width="1878" height="770" alt="image" src="https://github.com/user-attachments/assets/19b6eda2-dd89-4244-b1df-90dfc5d95bea" />|
+| **Broadcast Dashboard** | <img width="1855" height="899" alt="image" src="https://github.com/user-attachments/assets/4457dacd-0937-4253-85e2-43b861e754b7" />|
+| **Add Message Broadcast** | <img width="1598" height="495" alt="image" src="https://github.com/user-attachments/assets/cf142e0f-a46b-4836-8dca-a29ee2a61c03" />|
+| **Detail Broadcast** | <img width="1865" height="815" alt="image" src="https://github.com/user-attachments/assets/3d6c75f5-26e5-4294-95ba-a00f452f7ca0" />|
 | **Api Documentation** | <img width="1863" height="867" alt="image" src="https://github.com/user-attachments/assets/689b81a2-907e-4282-b74f-7ac12aa8eeb4" />|
 
 
