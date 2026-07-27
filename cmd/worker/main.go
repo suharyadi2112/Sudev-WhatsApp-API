@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"os"
@@ -78,6 +79,9 @@ func main() {
 	if OutboxDB != ConfigDB {
 		defer OutboxDB.Close()
 	}
+
+	// 2b. Cleanup stale status 3 (processing) outbox items from previous crashes/resets
+	CleanupStaleProcessingOutbox(context.Background())
 
 	// 3. Worker Configuration
 	apiBaseURL := os.Getenv("OUTBOX_API_BASEURL")

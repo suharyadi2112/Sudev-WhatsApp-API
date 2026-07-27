@@ -22,6 +22,7 @@ type WorkerConfigRequest struct {
 	WebhookURL         string `json:"webhook_url"`
 	WebhookSecret      string `json:"webhook_secret"`
 	AllowMedia         *bool  `json:"allow_media"`
+	ReplacePending     *bool  `json:"replace_pending"`
 	UserID             int    `json:"user_id"` // Used for admin override
 }
 
@@ -131,6 +132,10 @@ func CreateWorkerConfig(c echo.Context) error {
 		config.AllowMedia = *req.AllowMedia
 	}
 
+	if req.ReplacePending != nil {
+		config.ReplacePending = *req.ReplacePending
+	}
+
 	// Set user_id from authenticated user (admin can override)
 	isAdmin := claims.Role == "admin"
 	if isAdmin && req.UserID != 0 {
@@ -218,6 +223,10 @@ func UpdateWorkerConfig(c echo.Context) error {
 
 	if req.AllowMedia != nil {
 		config.AllowMedia = *req.AllowMedia
+	}
+
+	if req.ReplacePending != nil {
+		config.ReplacePending = *req.ReplacePending
 	}
 
 	if err := model.UpdateWorkerConfig(c.Request().Context(), &config); err != nil {

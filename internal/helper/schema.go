@@ -607,6 +607,11 @@ func InitCustomSchema() {
 				WHEN duplicate_column THEN RAISE NOTICE 'column interval_max_seconds already exists, skipping';
 			END;
 			BEGIN
+				ALTER TABLE outbox_worker_config ADD COLUMN replace_pending BOOLEAN DEFAULT false NOT NULL;
+			EXCEPTION
+				WHEN duplicate_column THEN RAISE NOTICE 'column replace_pending already exists, skipping';
+			END;
+			BEGIN
 				ALTER TABLE worker_system_logs ADD COLUMN worker_id INTEGER;
 			EXCEPTION
 				WHEN duplicate_column THEN RAISE NOTICE 'column worker_id already exists, skipping';
