@@ -53,6 +53,7 @@ type WorkerConfig struct {
 	IntervalMaxSeconds int            `json:"interval_max_seconds"`
 	Enabled            bool           `json:"enabled"`
 	AllowMedia         bool           `json:"allow_media"`
+	ReplacePending     bool           `json:"replace_pending"`
 	WebhookURL         sql.NullString `json:"webhook_url"`
 	WebhookSecret      sql.NullString `json:"webhook_secret"`
 	CreatedAt          time.Time      `json:"created_at"`
@@ -62,7 +63,7 @@ type WorkerConfig struct {
 func FetchWorkerConfigs(ctx context.Context) ([]WorkerConfig, error) {
 	query := `
 		SELECT id, user_id, worker_name, circle, application, message_type,
-		       interval_seconds, interval_max_seconds, enabled, allow_media, webhook_url, webhook_secret, created_at, updated_at
+		       interval_seconds, interval_max_seconds, enabled, allow_media, replace_pending, webhook_url, webhook_secret, created_at, updated_at
 		FROM outbox_worker_config
 		WHERE enabled = true
 	`
@@ -87,6 +88,7 @@ func FetchWorkerConfigs(ctx context.Context) ([]WorkerConfig, error) {
 			&config.IntervalMaxSeconds,
 			&config.Enabled,
 			&config.AllowMedia,
+			&config.ReplacePending,
 			&config.WebhookURL,
 			&config.WebhookSecret,
 			&config.CreatedAt,
@@ -279,5 +281,32 @@ func LogWorkerEvent(workerID int, workerName, level, message string) {
 	_, err := ConfigDB.Exec(ConfigSQL(query), wID, workerName, level, message)
 	if err != nil {
 		log.Printf("CRITICAL: Failed to write system log to DB: %v", err)
+	}
+}
+
+// CleanupStaleProcessingOutbox resets any outbox items stuck in status 3 (processing) for more than 5 minutes to status 2 (failed)
+func CleanupStaleProcessingOutbox(ctx context.Context) {
+	query := `
+		UPDATE outbox 
+		SET status = 2, msg_error = 'Processing timeout / worker restarted' 
+		WHERE status = 3 AND insertDateTime < NOW() - INTERVAL '5 minutes'
+	`
+	if OutboxDriver == "mysql" {
+		query = `
+			UPDATE outbox 
+			SET status = 2, msg_error = 'Processing timeout / worker restarted' 
+			WHERE status = 3 AND insertDateTime < NOW() - INTERVAL 5 MINUTE
+		`
+	}
+
+	res, err := OutboxDB.ExecContext(ctx, query)
+	if err != nil {
+		log.Printf("⚠️ Warning: Failed to cleanup stale processing outbox: %v", err)
+		return
+	}
+
+	rows, _ := res.RowsAffected()
+	if rows > 0 {
+		log.Printf("🧹 Cleaned up %d stale processing outbox items (set to status 2 / failed)", rows)
 	}
 }

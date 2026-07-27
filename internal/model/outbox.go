@@ -369,3 +369,55 @@ func BulkUpdateOutboxStatus(ctx context.Context, toStatus int, ids []int) (int64
 
 	return res.RowsAffected()
 }
+
+// CancelPendingOutboxForApp cancels existing pending (status 0) outbox records for a given destination and application
+func CancelPendingOutboxForApp(ctx context.Context, destination string, application string) (int64, error) {
+	if destination == "" {
+		return 0, nil
+	}
+
+	isMySQL := database.OutboxDriver == "mysql"
+	var query string
+	var args []interface{}
+	argCount := 1
+
+	placeholder := func(idx int) string {
+		if isMySQL {
+			return "?"
+		}
+		return "$" + strconv.Itoa(idx)
+	}
+
+	// Alternate phone format support (08xx vs 628xx)
+	var altDestination string
+	if strings.HasPrefix(destination, "0") {
+		altDestination = "62" + destination[1:]
+	} else if strings.HasPrefix(destination, "62") {
+		altDestination = "0" + destination[2:]
+	}
+
+	query = "UPDATE outbox SET status = 2, msg_error = 'Superseded by new request (replace_pending)' WHERE status = 0"
+
+	if altDestination != "" {
+		query += " AND (destination = " + placeholder(argCount) + " OR destination = " + placeholder(argCount+1) + ")"
+		args = append(args, destination, altDestination)
+		argCount += 2
+	} else {
+		query += " AND destination = " + placeholder(argCount)
+		args = append(args, destination)
+		argCount++
+	}
+
+	if application != "" {
+		query += " AND LOWER(application) = LOWER(" + placeholder(argCount) + ")"
+		args = append(args, application)
+		argCount++
+	}
+
+	res, err := database.OutboxDB.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	return res.RowsAffected()
+}

@@ -170,12 +170,14 @@ func CreateOutboxQueue(c echo.Context) error {
 
 		// Validation & conversion
 		var models []model.Outbox
-		for i, req := range reqs {
+		for _, req := range reqs {
 			if req.Destination == "" || req.Messages == "" {
 				return ErrorResponse(c, http.StatusBadRequest, "destination and messages are required for all records", "VALIDATION_ERROR", "")
 			}
+			if shouldReplace, _ := model.ShouldReplacePendingForApp(ctx, req.Application); shouldReplace {
+				_, _ = model.CancelPendingOutboxForApp(ctx, req.Destination, req.Application)
+			}
 			models = append(models, req.ToModel())
-			_ = i
 		}
 
 		if err := model.CreateOutboxBatch(ctx, models); err != nil {
@@ -193,6 +195,10 @@ func CreateOutboxQueue(c echo.Context) error {
 
 		if req.Destination == "" || req.Messages == "" {
 			return ErrorResponse(c, http.StatusBadRequest, "destination and messages are required", "VALIDATION_ERROR", "")
+		}
+
+		if shouldReplace, _ := model.ShouldReplacePendingForApp(ctx, req.Application); shouldReplace {
+			_, _ = model.CancelPendingOutboxForApp(ctx, req.Destination, req.Application)
 		}
 
 		outboxModel := req.ToModel()
