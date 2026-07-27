@@ -338,6 +338,7 @@ func PurgeSupersededPendingOutbox(ctx context.Context, filter string) (int64, er
 		`
 	} else {
 		// MySQL query
+		o1Filter := strings.ReplaceAll(filter, "application", "o1.application")
 		query = `
 			UPDATE outbox o1
 			JOIN (
@@ -358,8 +359,8 @@ func PurgeSupersededPendingOutbox(ctx context.Context, filter string) (int64, er
 			SET o1.status = 2, o1.msg_error = 'Superseded by newer pending message (replace_pending)'
 			WHERE o1.status = 0 AND o1.id_outbox < o2.max_id
 		`
-		if filter != "" {
-			query += fmt.Sprintf(" AND (%s) ", filter)
+		if o1Filter != "" {
+			query += fmt.Sprintf(" AND (%s) ", o1Filter)
 		}
 	}
 
