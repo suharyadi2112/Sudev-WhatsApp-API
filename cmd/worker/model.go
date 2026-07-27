@@ -310,3 +310,68 @@ func CleanupStaleProcessingOutbox(ctx context.Context) {
 		log.Printf("🧹 Cleaned up %d stale processing outbox items (set to status 2 / failed)", rows)
 	}
 }
+
+// PurgeSupersededPendingOutbox cancels older pending messages (status 0) for the same destination & application, leaving only the latest message
+func PurgeSupersededPendingOutbox(ctx context.Context, filter string) (int64, error) {
+	var query string
+	if OutboxDriver == "postgres" {
+		query = `
+			UPDATE outbox
+			SET status = 2, msg_error = 'Superseded by newer pending message (replace_pending)'
+			WHERE status = 0
+		`
+		if filter != "" {
+			query += fmt.Sprintf(" AND (%s) ", filter)
+		}
+		query += `
+			  AND id_outbox NOT IN (
+				  SELECT MAX(id_outbox)
+				  FROM outbox
+				  WHERE status = 0
+		`
+		if filter != "" {
+			query += fmt.Sprintf(" AND (%s) ", filter)
+		}
+		query += `
+				  GROUP BY destination, application
+			  )
+		`
+	} else {
+		// MySQL query
+		query = `
+			UPDATE outbox o1
+			JOIN (
+				SELECT destination, application, MAX(id_outbox) AS max_id
+				FROM outbox
+				WHERE status = 0
+		`
+		if filter != "" {
+			query += fmt.Sprintf(" AND (%s) ", filter)
+		}
+		query += `
+				GROUP BY destination, application
+			) o2 ON (
+				o1.destination = o2.destination OR
+				(o1.destination LIKE '0%' AND o2.destination = CONCAT('62', SUBSTRING(o1.destination, 2))) OR
+				(o1.destination LIKE '62%' AND o2.destination = CONCAT('0', SUBSTRING(o1.destination, 3)))
+			) AND LOWER(COALESCE(o1.application, '')) = LOWER(COALESCE(o2.application, ''))
+			SET o1.status = 2, o1.msg_error = 'Superseded by newer pending message (replace_pending)'
+			WHERE o1.status = 0 AND o1.id_outbox < o2.max_id
+		`
+		if filter != "" {
+			query += fmt.Sprintf(" AND (%s) ", filter)
+		}
+	}
+
+	res, err := OutboxDB.ExecContext(ctx, query)
+	if err != nil {
+		log.Printf("⚠️ [replace_pending] Worker purge error: %v", err)
+		return 0, err
+	}
+
+	rows, _ := res.RowsAffected()
+	if rows > 0 {
+		log.Printf("🧹 [replace_pending] Worker purged %d superseded pending outbox messages (set to status 2)", rows)
+	}
+	return rows, nil
+}
