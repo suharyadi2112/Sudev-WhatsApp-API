@@ -93,6 +93,11 @@ func (w *WorkerInstance) runCycle() {
 		filter = fmt.Sprintf("application = '%s'", w.config.Application)
 	}
 
+	// 1b. If replace_pending is enabled for this worker, purge older superseded pending messages
+	if w.config.ReplacePending {
+		_, _ = PurgeSupersededPendingOutbox(w.ctx, filter)
+	}
+
 	// 2. Claim a pending message (atomicly sets status to 3)
 	msg, err := ClaimPendingOutbox(w.ctx, filter)
 
