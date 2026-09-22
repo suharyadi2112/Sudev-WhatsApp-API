@@ -287,13 +287,16 @@ func eventHandler(instanceID string) func(evt interface{}) {
 			// Filter pesan lama (History Sync)
 			// Jika pesan lebih tua dari 2 menit, skip
 			if time.Since(msgTime) > 2*time.Minute {
-				// fmt.Println("Ignoring old message from history sync")
 				return
 			}
 
 			// Skip messages from self (echo messages)
-			// Ini mencegah duplikasi di Human vs Bot room
 			if v.Info.IsFromMe {
+				return
+			}
+
+			// Abaikan pesan dari Grup dan Status/Story broadcast (Hanya proses pesan pribadi/DM)
+			if v.Info.IsGroup || v.Info.Chat.Server == "broadcast" || v.Info.Sender.Server == "broadcast" {
 				return
 			}
 
@@ -314,13 +317,6 @@ func eventHandler(instanceID string) func(evt interface{}) {
 				messageText = v.Message.GetVideoMessage().GetCaption()
 			}
 
-			fmt.Printf("📨 Received message from %s: %s\n", v.Info.Sender, messageText)
-
-			// Debug logging for sender investigation
-			fmt.Printf("🔍 DEBUG - Full sender: %s\n", v.Info.Sender.String())
-			fmt.Printf("🔍 DEBUG - User: %s, Server: %s\n", v.Info.Sender.User, v.Info.Sender.Server)
-			fmt.Printf("🔍 DEBUG - IsGroup: %v, IsFromMe: %v\n", v.Info.IsGroup, v.Info.IsFromMe)
-
 			senderNumber := v.Info.Sender.User
 
 			// If message from linked device (@lid), resolve to real phone number
@@ -333,17 +329,11 @@ func eventHandler(instanceID string) func(evt interface{}) {
 					phoneJID, err := session.Client.Store.LIDs.GetPNForLID(ctx, v.Info.Sender)
 					if err == nil && phoneJID.User != "" {
 						senderNumber = phoneJID.User
-						log.Printf("✅ Resolved LID %s to phone number: %s", v.Info.Sender.User, senderNumber)
-					} else {
-						log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-						log.Printf("⚠️ HUMAN_VS_BOT: Could not resolve LID to phone number")
-						log.Printf("👤 Contact Name: %s", v.Info.PushName)
-						log.Printf("🔑 LID (Use this for whitelisting): %s", v.Info.Sender.User)
-						log.Printf("💡 To enable auto-reply, set whitelisted_number = '%s'", v.Info.Sender.User)
-						log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 					}
 				}
 			}
+
+			fmt.Printf("📨 Received DM from %s (%s): %s\n", senderNumber, v.Info.PushName, messageText)
 
 			if err := HandleIncomingMessage(instanceID, senderNumber, messageText, v.Info.Chat, v.Info.ID, v.Info.Sender.String()); err != nil {
 				log.Printf("[HUMAN_VS_BOT] Error handling incoming message: %v", err)
@@ -367,13 +357,11 @@ func eventHandler(instanceID string) func(evt interface{}) {
 					"event": "incoming_message",
 					"data":  payload,
 				})
-				fmt.Printf("✓ Message broadcasted to WebSocket listeners for instance: %s\n", instanceID)
 			}
 
-			//Broadcast ke Webhook (jika diaktifkan)
+			// Broadcast ke Webhook (jika diaktifkan)
 			if config.EnableWebhook {
 				SendIncomingMessageWebhook(instanceID, payload)
-				fmt.Printf("✓ Webhook dispatched for instance: %s\n", instanceID)
 			}
 
 		}

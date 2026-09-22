@@ -41,16 +41,19 @@ func GetWebhookConfig(instanceID string) (*WebhookConfig, error) {
 	config, exists := webhookCache[instanceID]
 	webhookCacheMutex.RUnlock()
 
-	// ✅ IMPROVEMENT: Cek apakah cache masih valid (belum expired)
-	if exists && config != nil && time.Now().Before(config.ExpiresAt) {
+	// ✅ IMPROVEMENT: Cek apakah cache masih valid (belum expired) dan memiliki URL yang tidak kosong
+	if exists && config != nil && config.URL != "" && time.Now().Before(config.ExpiresAt) {
 		return config, nil
 	}
 
-	// Cache miss atau expired - load dari DB
+	// Cache miss atau expired atau sebelumnya kosong - load langsung dari DB
 	inst, err := model.GetInstanceByInstanceID(instanceID)
 	if err != nil {
+		log.Printf("❌ Gagal membaca instance %s dari DB: %v", instanceID, err)
 		return nil, err
 	}
+
+	log.Printf("🔍 DB Read untuk %s: WebhookURL='%s' (Valid: %v, Phone: %s)", instanceID, inst.WebhookURL.String, inst.WebhookURL.Valid, inst.PhoneNumber.String)
 
 	// Buat config object dengan expiry time
 	config = &WebhookConfig{
@@ -59,12 +62,14 @@ func GetWebhookConfig(instanceID string) (*WebhookConfig, error) {
 		ExpiresAt: time.Now().Add(webhookCacheTTL), // ← Set expiry
 	}
 
-	// Simpan ke cache
-	webhookCacheMutex.Lock()
-	webhookCache[instanceID] = config
-	webhookCacheMutex.Unlock()
+	// Hanya cache jika URL terisi, agar jika user baru mengisi di DB langsung terbaca
+	if config.URL != "" {
+		webhookCacheMutex.Lock()
+		webhookCache[instanceID] = config
+		webhookCacheMutex.Unlock()
+		log.Printf("✅ Webhook config cached for instance: %s (expires in %v)", instanceID, webhookCacheTTL)
+	}
 
-	log.Printf("✅ Webhook config cached for instance: %s (expires in %v)", instanceID, webhookCacheTTL)
 	return config, nil
 }
 
@@ -76,11 +81,21 @@ func InvalidateWebhookCache(instanceID string) {
 	log.Printf("🗑️ Webhook cache invalidated for instance: %s", instanceID)
 }
 
-// ✅ FIX: Refactored function - sekarang pakai cache
+// Global HTTP Client dengan Connection Pooling (Keep-Alive Reuse)
+var webhookHTTPClient = &http.Client{
+	Timeout: 10 * time.Second,
+	Transport: &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 20,
+		IdleConnTimeout:     90 * time.Second,
+	},
+}
+
+// ✅ FIX: Refactored function - sekarang pakai cache & full logging
 func SendIncomingMessageWebhook(instanceID string, data map[string]interface{}) {
 	// Get webhook config dari cache (bukan DB!)
 	config, err := GetWebhookConfig(instanceID)
-	if err != nil || config.URL == "" {
+	if err != nil || config == nil || config.URL == "" {
 		return
 	}
 
@@ -92,13 +107,13 @@ func SendIncomingMessageWebhook(instanceID string, data map[string]interface{}) 
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("webhook: marshal error: %v", err)
+		log.Printf("❌ Webhook: marshal error: %v", err)
 		return
 	}
 
 	req, err := http.NewRequest("POST", config.URL, bytes.NewReader(body))
 	if err != nil {
-		log.Printf("webhook: new request error: %v", err)
+		log.Printf("❌ Webhook: new request error: %v", err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -112,13 +127,13 @@ func SendIncomingMessageWebhook(instanceID string, data map[string]interface{}) 
 		req.Header.Set("X-SUDEVWA-Signature", signature)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
 	go func() {
-		resp, err := client.Do(req)
+		resp, err := webhookHTTPClient.Do(req)
 		if err != nil {
-			log.Printf("webhook: send error: %v", err)
+			log.Printf("❌ Webhook: Gagal kirim ke %s: %v", config.URL, err)
 			return
 		}
-		_ = resp.Body.Close()
+		defer resp.Body.Close()
+		log.Printf("✅ Webhook: Terkirim ke %s [%s]", config.URL, resp.Status)
 	}()
 }

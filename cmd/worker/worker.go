@@ -230,6 +230,8 @@ func (w *WorkerInstance) sendWebhook(msg *OutboxMessage, status int, statusText 
 			"status":      status,
 			"status_text": statusText,
 			"destination": msg.Destination,
+			"message":     msg.Messages,
+			"file":        msg.File.String,
 			"from_number": fromNumber,
 			"application": msg.Application,
 			"table_id":    msg.TableID.String,
