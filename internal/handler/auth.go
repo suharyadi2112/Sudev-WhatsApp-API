@@ -525,8 +525,8 @@ func UpdateInstanceFields(c echo.Context) error {
 	}
 
 	// Validate at least one field is provided
-	if req.Used == nil && req.Keterangan == nil && req.Circle == nil {
-		return ErrorResponse(c, http.StatusBadRequest, "At least one field (used, keterangan, or circle) must be provided", "NO_FIELDS", "")
+	if req.Used == nil && req.Keterangan == nil && req.Circle == nil && req.WebhookURL == nil && req.WebhookSecret == nil {
+		return ErrorResponse(c, http.StatusBadRequest, "At least one field (used, keterangan, circle, webhook_url, or webhook_secret) must be provided", "NO_FIELDS", "")
 	}
 
 	err := model.UpdateInstanceFields(instanceID, &req)
@@ -535,6 +535,11 @@ func UpdateInstanceFields(c echo.Context) error {
 			return ErrorResponse(c, http.StatusNotFound, "Instance not found", "INSTANCE_NOT_FOUND", "")
 		}
 		return ErrorResponse(c, http.StatusInternalServerError, "Failed to update instance", "UPDATE_FAILED", err.Error())
+	}
+
+	// Invalidate cache jika webhook_url atau webhook_secret diupdate
+	if req.WebhookURL != nil || req.WebhookSecret != nil {
+		service.InvalidateWebhookCache(instanceID)
 	}
 
 	return SuccessResponse(c, http.StatusOK, "Instance updated successfully", map[string]interface{}{

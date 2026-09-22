@@ -62,6 +62,8 @@ type InstanceResp struct {
 	Used              bool      `json:"used"`
 	Keterangan        string    `json:"keterangan"`
 	CreatedBy         int64     `json:"createdBy,omitempty"`
+	WebhookURL        string    `json:"webhookUrl"`
+	WebhookSecret     string    `json:"webhookSecret"`
 }
 
 var ErrNoActiveInstance = errors.New("no active instance for this phone number")
@@ -186,7 +188,9 @@ func GetAllInstances() ([]Instance, error) {
 			circle,
 			used,
 			keterangan,
-			created_by
+			created_by,
+			webhook_url,
+			webhook_secret
         FROM instances
         ORDER BY 
             CASE WHEN circle = 'one' THEN 0 ELSE 1 END,
@@ -230,6 +234,8 @@ func GetAllInstances() ([]Instance, error) {
 			&inst.Used,
 			&inst.Keterangan,
 			&inst.CreatedBy,
+			&inst.WebhookURL,
+			&inst.WebhookSecret,
 		)
 
 		if err != nil {
@@ -516,17 +522,26 @@ func ToResponse(inst Instance) InstanceResp {
 		resp.CreatedBy = inst.CreatedBy.Int64
 	}
 
+	if inst.WebhookURL.Valid {
+		resp.WebhookURL = inst.WebhookURL.String
+	}
+	if inst.WebhookSecret.Valid {
+		resp.WebhookSecret = inst.WebhookSecret.String
+	}
+
 	return resp
 }
 
 // UpdateInstanceFieldsRequest for PATCH /instances/:instanceId
 type UpdateInstanceFieldsRequest struct {
-	Used       *bool   `json:"used"`       // pointer to allow null (optional)
-	Keterangan *string `json:"keterangan"` // pointer to allow null (optional)
-	Circle     *string `json:"circle"`     // pointer to allow null (optional)
+	Used          *bool   `json:"used"`           // pointer to allow null (optional)
+	Keterangan    *string `json:"keterangan"`     // pointer to allow null (optional)
+	Circle        *string `json:"circle"`         // pointer to allow null (optional)
+	WebhookURL    *string `json:"webhook_url"`    // pointer to allow null (optional)
+	WebhookSecret *string `json:"webhook_secret"` // pointer to allow null (optional)
 }
 
-// UpdateInstanceFields updates used and keterangan fields
+// UpdateInstanceFields updates used, keterangan, circle, webhook_url, and webhook_secret fields
 func UpdateInstanceFields(instanceID string, req *UpdateInstanceFieldsRequest) error {
 	// Build dynamic query based on what fields are provided
 	query := "UPDATE instances SET "
@@ -549,6 +564,18 @@ func UpdateInstanceFields(instanceID string, req *UpdateInstanceFieldsRequest) e
 	if req.Circle != nil {
 		updates = append(updates, fmt.Sprintf("circle = $%d", argCount))
 		args = append(args, *req.Circle)
+		argCount++
+	}
+
+	if req.WebhookURL != nil {
+		updates = append(updates, fmt.Sprintf("webhook_url = $%d", argCount))
+		args = append(args, *req.WebhookURL)
+		argCount++
+	}
+
+	if req.WebhookSecret != nil {
+		updates = append(updates, fmt.Sprintf("webhook_secret = $%d", argCount))
+		args = append(args, *req.WebhookSecret)
 		argCount++
 	}
 

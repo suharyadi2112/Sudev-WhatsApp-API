@@ -2,12 +2,10 @@
 package handler
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"net/http"
 
 	"gowa-yourself/internal/model"
-	"gowa-yourself/internal/service" // ✅ FIX: Tambahkan import
+	"gowa-yourself/internal/service"
 
 	"github.com/labstack/echo/v4"
 )
@@ -17,7 +15,7 @@ type WebhookConfigRequest struct {
 	Secret string `json:"secret"`
 }
 
-// POST /api/instances/:instanceId/webhook
+// POST /api/instances/:instanceId/webhook-setconfig
 func SetWebhookConfig(c echo.Context) error {
 	instanceID := c.Param("instanceId")
 
@@ -43,33 +41,8 @@ func SetWebhookConfig(c echo.Context) error {
 			"webhook url must start with http:// or https://", "INVALID_URL", "")
 	}
 
-	// get current instance (to know existing secret)
-	inst, err := model.GetInstanceByInstanceID(instanceID)
-	if err != nil {
-		return ErrorResponse(c, http.StatusNotFound,
-			"Instance not found", "INSTANCE_NOT_FOUND", "")
-	}
-
-	effectiveSecret := req.Secret
-
-	// if client does not provide secret, generate or reuse existing
-	if effectiveSecret == "" {
-		if !inst.WebhookSecret.Valid || inst.WebhookSecret.String == "" {
-			// generate new random secret (32 bytes -> 64 hex chars)
-			b := make([]byte, 32)
-			if _, err := rand.Read(b); err != nil {
-				return ErrorResponse(c, http.StatusInternalServerError,
-					"Failed to generate webhook secret", "WEBHOOK_SECRET_GENERATION_FAILED", err.Error())
-			}
-			effectiveSecret = hex.EncodeToString(b)
-		} else {
-			// reuse existing secret
-			effectiveSecret = inst.WebhookSecret.String
-		}
-	}
-
-	// Update DB with url + effectiveSecret
-	if err := model.UpdateInstanceWebhook(instanceID, req.URL, effectiveSecret); err != nil {
+	// Update DB with url + secret (sesuai input user, kosong jika tidak diisi)
+	if err := model.UpdateInstanceWebhook(instanceID, req.URL, req.Secret); err != nil {
 		if err.Error() == "instance_not_found" {
 			return ErrorResponse(c, http.StatusNotFound,
 				"Instance not found", "INSTANCE_NOT_FOUND", "")
@@ -79,12 +52,12 @@ func SetWebhookConfig(c echo.Context) error {
 			"Failed to update webhook config", "WEBHOOK_UPDATE_FAILED", err.Error())
 	}
 
-	// ✅ FIX: Invalidate cache setelah update webhook config
+	// ✅ Invalidate cache setelah webhook config diupdate
 	service.InvalidateWebhookCache(instanceID)
 
 	return SuccessResponse(c, http.StatusOK, "Webhook config updated", map[string]interface{}{
 		"instanceId": instanceID,
 		"webhookUrl": req.URL,
-		"secret":     effectiveSecret, // user must store this securely
+		"secret":     req.Secret,
 	})
 }
