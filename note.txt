@@ -7,5 +7,9 @@ go build -o sudevwa main.go
 # Build Worker (Lakukan ini dari root)
 go build -o worker cmd/worker/*.go
 
+manual
+go run ./cmd/worker
+
+
 Setelah di-build, Jika sebelumnya pm2 nya belum ada, maka anda tinggal jalankan:
 pm2 start ecosystem.config.js (jika sudah pernah di jalankan, maka restart saja nama pm2 nya)
