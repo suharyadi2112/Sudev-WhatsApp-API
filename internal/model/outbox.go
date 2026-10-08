@@ -189,12 +189,14 @@ func GetOutboxQueue(ctx context.Context, status *int, application string, search
 
 	if search != "" {
 		if isMySQL {
-			query += ` AND (LOWER(from_number) LIKE ` + placeholder(argCount) + ` OR LOWER(destination) LIKE ` + placeholder(argCount) + ` OR LOWER(messages) LIKE ` + placeholder(argCount) + ` OR LOWER(application) LIKE ` + placeholder(argCount) + `)`
+			query += ` AND (LOWER(from_number) LIKE ? OR LOWER(destination) LIKE ? OR LOWER(messages) LIKE ? OR LOWER(application) LIKE ?)`
+			searchParam := "%" + strings.ToLower(search) + "%"
+			args = append(args, searchParam, searchParam, searchParam, searchParam)
 		} else {
 			query += ` AND (from_number ILIKE ` + placeholder(argCount) + ` OR destination ILIKE ` + placeholder(argCount) + ` OR messages ILIKE ` + placeholder(argCount) + ` OR application ILIKE ` + placeholder(argCount) + `)`
+			args = append(args, "%"+strings.ToLower(search)+"%")
+			argCount++
 		}
-		args = append(args, "%"+strings.ToLower(search)+"%")
-		argCount++
 	}
 
 	query += ` ORDER BY insertDateTime DESC LIMIT ` + placeholder(argCount)
@@ -273,12 +275,14 @@ func GetOutboxQueueCount(ctx context.Context, status *int, application string, s
 
 	if search != "" {
 		if isMySQL {
-			query += ` AND (LOWER(from_number) LIKE ` + placeholder(argCount) + ` OR LOWER(destination) LIKE ` + placeholder(argCount) + ` OR LOWER(messages) LIKE ` + placeholder(argCount) + ` OR LOWER(application) LIKE ` + placeholder(argCount) + `)`
+			query += ` AND (LOWER(from_number) LIKE ? OR LOWER(destination) LIKE ? OR LOWER(messages) LIKE ? OR LOWER(application) LIKE ?)`
+			searchParam := "%" + strings.ToLower(search) + "%"
+			args = append(args, searchParam, searchParam, searchParam, searchParam)
 		} else {
 			query += ` AND (from_number ILIKE ` + placeholder(argCount) + ` OR destination ILIKE ` + placeholder(argCount) + ` OR messages ILIKE ` + placeholder(argCount) + ` OR application ILIKE ` + placeholder(argCount) + `)`
+			args = append(args, "%"+strings.ToLower(search)+"%")
+			argCount++
 		}
-		args = append(args, "%"+strings.ToLower(search)+"%")
-		argCount++
 	}
 
 	var count int
